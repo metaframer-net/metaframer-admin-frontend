@@ -42,7 +42,7 @@ export const Bottom: Story = {
   },
 };
 
-/** Left edge — vertical dock with a sliding hover highlight. */
+/** Left edge — vertical magnifying dock with an always-on lens that glides to the hover. */
 export const Left: Story = {
   args: { edge: 'left' },
   play: async () => {
@@ -53,10 +53,22 @@ export const Left: Story = {
   },
 };
 
-/** Right edge — vertical dock. */
-export const Right: Story = { args: { edge: 'right' } };
+/** Right edge — vertical magnifying dock (mirror of the left). */
+export const Right: Story = {
+  args: { edge: 'right' },
+  play: async () => {
+    const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
+    await userEvent.click(hint);
+    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    await expect(within(document.body).getByRole('link', { name: 'Genel Bakış' })).toBeInTheDocument();
+  },
+};
 
-/** Keyboard: focusing the hint opens the dock; Escape closes it and restores focus. */
+/**
+ * Keyboard: focusing the hint opens the dock; Escape closes it and restores focus —
+ * INCLUDING after focus has tabbed into the tiles (regression guard: the hint's focus
+ * handler must not re-open the dock while focus is being restored on Escape).
+ */
 export const Keyboard: Story = {
   args: { edge: 'bottom' },
   play: async () => {
@@ -64,11 +76,23 @@ export const Keyboard: Story = {
     hint.focus();
     await expect(hint).toHaveFocus();
     await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    // Move focus off the hint into a nav tile, then Escape from there.
+    await userEvent.tab();
+    await expect(hint).not.toHaveFocus();
     await userEvent.keyboard('{Escape}');
     await expect(hint).toHaveAttribute('aria-expanded', 'false');
     await expect(hint).toHaveFocus();
   },
 };
+
+/**
+ * The dock is permissions-driven and holds no async data, so it has no distinct
+ * loading / empty / error surfaces — these stubs render the resting dock and exist only
+ * for state-set parity with the sibling shell components (Storybook-first rule).
+ */
+export const Loading: Story = { args: { edge: 'bottom' } };
+export const Empty: Story = { args: { edge: 'bottom' } };
+export const ErrorState: Story = { args: { edge: 'bottom' }, name: 'Error' };
 
 /** Visible on mobile too — the collapsed hint tab renders and opens at a phone width. */
 export const MobileVisible: Story = {
