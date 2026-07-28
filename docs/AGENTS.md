@@ -28,12 +28,34 @@ FieldHelp/aria binding, token leaks, dead weight, design drift) are caught earli
 | **ux-design-critic** | sonnet | After building a page/feature; before a modernization phase. | Heuristic design review: visual hierarchy, spacing rhythm, motion-token consistency, empty/loading/error polish, mobile ergonomics (320/480/768), cross-feature consistency, DESIGN_SYSTEM adherence. Advisory (no PASS/FAIL). |
 | **dead-code-hunter** | haiku | Phase boundaries; when pruning. | Unused exports/files/deps, unreachable code, orphan stories/tests via `npx knip`/`ts-prune`/`depcheck` on demand (adds NO permanent dependency). Verifies each candidate by grep; separates CONFIRMED from SUSPECTED (schema-first exports, shadcn sub-exports, MSW registries, CSF re-exports are known false positives). |
 
+### Tier-1b — Golden-Rule & axis guardians (added post-Aşama 6)
+Two additions past the original "four is the ceiling" line — each guards a surface that previously had **no
+guardian at all**, so they are coverage, not noise: `ai-first-sentinel` is the missing enforcer for Golden Rule 4,
+and `performance-sentinel` is the missing enforcer for the optimization/perf axis.
+
+| Agent | Model | Use when | What it checks |
+|---|---|---|---|
+| **ai-first-sentinel** | haiku | Any component/feature/route change; before commit. | Golden Rule 4 (AI-first): `data-action`+`data-entity` on domain-intent interactive elements (pure-UI affordances exempted), route `routeMeta.aiEntity` coverage vs `nav-schema.ts`, the "AI proposes / human disposes" confirm-before-apply guardrail, and vocabulary consistency. |
+| **performance-sentinel** | sonnet | Perf-sensitive changes; at a phase boundary. | React render cost + bundle weight: heavy deps (recharts/leaflet) staying `React.lazy`-split, barrel-import blowups, unstable hook deps / missing memo on hot paths, `key={index}`, virtualization on >100-row collections, TanStack Query hygiene, context-value churn, and the bundle budget (`node scripts/check-bundle-size.mjs`). HIGH-confidence findings only. |
+
 ### Tier-2 — deferred (add when needed)
 - **security-sentinel** — input-validation gaps, unsafe `dangerouslySetInnerHTML`, secret/PII leakage, authz bypass.
 - **code-standards-enforcer** — project idioms: Zod-first schemas, MSW contract shape, hook conventions, file colocation.
 
 Deliberately not built yet — four Tier-1 agents is the ceiling before reviews turn to noise. Add a Tier-2
 agent only when a real recurring miss justifies it.
+
+## Mechanical layer (non-agent, zero review-token cost)
+Cheap, deterministic gates that front-run the agents so token-spend goes to real judgment calls:
+- **Stop hook** (`scripts/hooks/mechanical-check.sh`, wired in `.claude/settings.json`) — advisory grep on every
+  turn-stop for hardcoded colors outside `theme.css` + native `title=` help. Never blocks (exit 0); just surfaces
+  the #1 recurring leaks before they reach `design-token-guardian`/`a11y-sentinel`.
+- **Bundle budget** (`scripts/check-bundle-size.mjs`) — no-dep gzipped-size gate over `dist/assets`, run in CI
+  (`.github/workflows/quality.yml`) after Build. Budgets: initial ≤260KB, any async chunk ≤380KB, total ≤1200KB.
+  Diagnose a breach with `ANALYZE=1 npm run build` → `dist/stats.html` treemap (rollup-plugin-visualizer, dev-only).
+- **chrome-devtools MCP** (`.mcp.json`) — on-demand real Core Web Vitals / performance traces / network against the
+  running app (`npx chrome-devtools-mcp`, headless+isolated). Complements the `performance-sentinel` static review
+  with runtime measurement. No permanent dependency.
 
 ## How they compose
 - **During a task:** run the relevant Tier-1 agent(s) as you build (token-guardian + a11y-sentinel on a form

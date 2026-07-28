@@ -34,5 +34,17 @@
       "Bash(mkdir:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(cp:*)", "Bash(mv:*)", "Bash(touch:*)", "Bash(rm:*)"
     ]
   },
-  "attribution": { "coAuthoredBy": false }
+  "attribution": { "coAuthoredBy": false },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/hooks/mechanical-check.sh"
+          }
+        ]
+      }
+    ]
+  }
 }
