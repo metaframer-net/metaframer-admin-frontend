@@ -49,6 +49,29 @@ export const ZONING_LABELS: Record<(typeof ZONING)[number], string> = {
   imarsiz: 'İmarsız',
 };
 
+/** Listing intent (sale vs rent) — different search filters & price semantics. */
+export const PURPOSES = ['satilik', 'kiralik'] as const;
+export type Purpose = (typeof PURPOSES)[number];
+export const PURPOSE_LABELS: Record<Purpose, string> = { satilik: 'Satılık', kiralik: 'Kiralık' };
+
+/** Who is posting — drives which EİDS verification runs. */
+export const AUTHORITIES = ['sahibi', 'yakini', 'yetkili'] as const;
+export type Authority = (typeof AUTHORITIES)[number];
+export const AUTHORITY_META: Record<Authority, { label: string; hint: string }> = {
+  sahibi: { label: 'Mülk sahibiyim', hint: "EİDS'de taşınmaz sahipliği doğrulanır." },
+  yakini: { label: 'Yakını / eşiyim', hint: 'Birinci veya ikinci derece yakınlık doğrulanır.' },
+  yetkili: { label: 'Yetkili işletmeyim', hint: 'Taşınmaz sahibinin verdiği yetki aranır.' },
+};
+
+/** Category → sub-type options ("Mülk türü" → "Alt tür" in the wizard). */
+export const SUBTYPES: Record<Category, string[]> = {
+  konut: ['Daire', 'Rezidans', 'Müstakil ev', 'Villa'],
+  isyeri: ['Ofis', 'Dükkan', 'Depo', 'Fabrika'],
+  arsa: ['Konut arsası', 'Ticari arsa', 'Tarla'],
+  devremulk: ['Devremülk'],
+  turistik: ['Otel', 'Apart', 'Tatil köyü'],
+};
+
 /** Which attributes each category exposes in its dynamic form. */
 export const CATEGORY_ATTRIBUTES: Record<Category, string[]> = {
   konut: ['grossArea', 'netArea', 'rooms', 'buildingAge', 'floor', 'heating', 'deedStatus'],

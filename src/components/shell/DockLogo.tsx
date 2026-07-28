@@ -1,4 +1,4 @@
-import { Hexagon } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,7 @@ export function DockLogo({ className }: DockLogoProps) {
       data-slot="dock-logo"
       aria-hidden="true"
     >
-      <Hexagon className="size-4" />
+      <Sparkles className="size-4" />
     </span>
   );
 }

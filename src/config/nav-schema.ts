@@ -30,6 +30,9 @@ export interface NavItem {
   permission?: Permission;
   /** Groups: sidebar sub-sections / topnav mega-menu columns. */
   children?: NavItem[];
+  /** Optional count/label pill shown next to the item in the command center's
+      sub-navigation list (e.g. a pending-moderation count). Wire to real data. */
+  badge?: string;
   /** For the AI copilot to map intents to modules. */
   aiEntity?: string;
   /** Eligible for the mobile bottom nav (<=5 primary items). */

@@ -32,8 +32,8 @@ export const Default: Story = {
     const dialog = await within(document.body).findByRole('dialog', {
       name: 'Nereye gitmek istersin?',
     });
-    // The shared body is present: identity strip + module cards + NL box.
-    await expect(within(dialog).getByText('Ahmet Yönetici')).toBeInTheDocument();
+    // The shared body is present: chip row + module cards + NL command bar.
+    await expect(within(dialog).getByRole('button', { name: 'AI Asistanı' })).toBeInTheDocument();
     await expect(within(dialog).getByRole('link', { name: /Genel Bakış/ })).toHaveAttribute(
       'aria-current',
       'page',

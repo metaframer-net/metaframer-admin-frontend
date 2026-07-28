@@ -75,6 +75,11 @@ export const listingFormSchema = z
     il: z.string().min(1, 'İl seçin'),
     ilce: z.string().min(1, 'İlçe seçin'),
     mahalle: z.string().min(1, 'Mahalle seçin'),
+    // Mülk bilgileri (step 1)
+    purpose: z.enum(['satilik', 'kiralik']),
+    subType: z.string().optional(),
+    authority: z.enum(['sahibi', 'yakini', 'yetkili']),
+    adaParsel: z.string().optional(),
     grossArea: z.string().optional(),
     netArea: z.string().optional(),
     rooms: z.string().optional(),

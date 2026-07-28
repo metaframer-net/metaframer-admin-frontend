@@ -1445,3 +1445,27 @@ Entry format:
 Tasks 000 → 027 done. Full product (12 modules), design system, AI-first layer, RBAC/audit, quality-agent tooling,
 modernization (breakpoints/mobile/dock/motion/bento), executive report, and the Pages deploy pipeline are all in place.
 Awaiting the user's manual commit of Task 027 and the one-time Pages "Source: GitHub Actions" switch.
+
+## Enterprise İlanlar arc (ADR 0007) — Tasks 028 → 031 (MARATHON)
+Approved from `docs/mockups/enterprise-listings.html` (Calm Signal tokens; no reference-palette clone).
+
+- **028 — DataTable column header filters.** Funnel on the LEFT of each filterable column header
+  (faceted/range/date/search), URL-synced via the same `setFilter` as the toolbar. Listings columns
+  wired; MSW gains an `ai` filter param. dod-reviewer: Ready-to-commit YES. Verified in-app.
+- **029 — KPI strip + inline status edit.** `/listings/stats` + `useListingStats`;
+  `ListingsKpiStrip`; `useSetListingStatus` + `ListingStatusSelect` in the actions column
+  (permission-gated). Verified in-app (KPI + 25 inline selects).
+- **030 — Multi-view (Tablo/Kanban/Galeri/Harita).** `ListingsViewSwitch` (`?view=`),
+  `ListingKanban`, `ListingGallery`, lazy `ListingsMap` (reuses `MapView`); `fitBounds` no-animate
+  fix. Verified in-app (all 4 views switch; map deep-links `?view=map`).
+- **031 — Create wizard rail + preview.** `Wizard` gains an optional `aside` rail; `ListingCreatePage`
+  adds `CreateWizardRail` (EİDS checklist + quality score) and a final-step live `ListingPreviewCard`.
+  Verified in-app (rail + score %25 on step 1).
+
+Verification (all phases): `typecheck` clean · `lint` 0 errors · `build` OK · listings + data-table
+story tests green (57+ tests) · real-app smoke 0 console errors. Full `npm run test` remains
+environmentally flaky on this machine (heavy Storybook browser stories time out under parallel load,
+count varies run-to-run; all touched files pass in isolation). Pre-existing unrelated red:
+`CommandLauncher > Cards` (stems from uncommitted working-tree dock edits, not this arc).
+
+Awaiting the user's manual commits (phase-by-phase; see final report).
