@@ -72,6 +72,7 @@ function applyQuery(url: URL): Paginated<Listing> {
   const q = url.searchParams.get('q')?.toLocaleLowerCase('tr') ?? '';
   const statuses = url.searchParams.getAll('status');
   const categories = url.searchParams.getAll('category');
+  const ais = url.searchParams.getAll('ai');
   const il = url.searchParams.get('il');
   const priceMin = url.searchParams.get('priceMin');
   const priceMax = url.searchParams.get('priceMax');
@@ -81,6 +82,7 @@ function applyQuery(url: URL): Paginated<Listing> {
     if (q && !l.title.toLocaleLowerCase('tr').includes(q)) return false;
     if (statuses.length && !statuses.includes(l.status)) return false;
     if (categories.length && !categories.includes(l.category)) return false;
+    if (ais.length && !ais.includes(l.aiSuggestion)) return false;
     if (il && l.il !== il) return false;
     if (priceMin && l.price < Number(priceMin)) return false;
     if (priceMax && l.price > Number(priceMax)) return false;
@@ -104,6 +106,17 @@ function applyQuery(url: URL): Paginated<Listing> {
 
 export const listingsHandlers = [
   http.get(`${API_BASE_URL}/listings`, ({ request }) => HttpResponse.json(applyQuery(new URL(request.url)))),
+
+  // Aggregate KPI counts. Registered BEFORE `/listings/:id` so `/stats` is not
+  // captured by the `:id` param route.
+  http.get(`${API_BASE_URL}/listings/stats`, () =>
+    HttpResponse.json({
+      total: db.length,
+      pending: db.filter((l) => l.status === 'pending').length,
+      aiNok: db.filter((l) => l.aiSuggestion === 'nok').length,
+      active: db.filter((l) => l.status === 'active').length,
+    }),
+  ),
 
   http.get(`${API_BASE_URL}/listings/:id`, ({ params }) => {
     const listing = db.find((l) => l.id === params.id);

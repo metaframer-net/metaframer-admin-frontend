@@ -31,6 +31,21 @@ export function useListings(query: TableQuery) {
   });
 }
 
+/** Aggregate KPI counts for the listings header strip. */
+export interface ListingStats {
+  total: number;
+  pending: number;
+  aiNok: number;
+  active: number;
+}
+
+export function useListingStats() {
+  return useQuery({
+    queryKey: [...listingKeys.all, 'stats'] as const,
+    queryFn: () => api.get<ListingStats>('/listings/stats'),
+  });
+}
+
 /** Single listing detail. */
 export function useListing(id: string | undefined) {
   return useQuery({

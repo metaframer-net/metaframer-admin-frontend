@@ -52,6 +52,24 @@ export function useModerateListing(id: string) {
   });
 }
 
+/**
+ * Inline status quick-edit from the listings table (DATA_TABLE_SPEC-style row
+ * action). PATCHes the status and invalidates the list + KPI stats. Toasts on
+ * success/failure; the table refetch reconciles the row.
+ */
+export function useSetListingStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Listing['status'] }) =>
+      api.patch<Listing>(`/listings/${id}`, { status }),
+    onSuccess: () => {
+      toast.success('İlan durumu güncellendi.');
+      void qc.invalidateQueries({ queryKey: listingKeys.all });
+    },
+    onError: () => toast.error('Durum güncellenemedi.'),
+  });
+}
+
 /** The audit actor recorded for copilot-originated approvals. */
 export const AI_MODERATION_ACTOR = 'ai:moderation-copilot';
 
