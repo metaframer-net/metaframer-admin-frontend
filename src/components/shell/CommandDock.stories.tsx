@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Decorator } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import type { NotificationsPayload } from '@/features/notifications';
 import { DEFAULT_FLAGS } from '@/lib/settings/feature-flags';
@@ -85,10 +85,62 @@ export const InlineNav: Story = {
     // Hovering the launcher reveals the strip (pointer-events flip to auto).
     await userEvent.hover(body.getByRole('button', { name: LAUNCHER }));
     await expect(body.getByRole('navigation', { name: 'Hızlı gezinme' })).toBeInTheDocument();
-    // Clicking a dot opens the command center → the pill retracts (morph feel).
+    // Clicking a dot opens the command center inside the pill (it does not navigate).
     await userEvent.click(overview);
-    const dock = document.body.querySelector('[data-entity="dock"]') as HTMLElement;
-    await expect(dock).toHaveClass('opacity-0');
+    await expect(
+      body.getByRole('dialog', { name: 'Nereye gitmek istersin?' }),
+    ).toBeInTheDocument();
+  },
+};
+
+/**
+ * Stage 3 — the panel unfolds INSIDE the pill: the pill row stays put, the
+ * surface rounds and grows downward. It is a modal dialog, so focus moves to the
+ * close control and is trapped, the page behind is scroll-locked, and Escape
+ * hands focus back to the pill.
+ */
+export const PanelOpen: Story = {
+  parameters: { viewport: { defaultViewport: 'bpXl' } },
+  play: async () => {
+    const body = within(document.body);
+    const pill = body.getByRole('button', { name: LAUNCHER });
+    await userEvent.click(pill);
+
+    const dialog = await body.findByRole('dialog', { name: 'Nereye gitmek istersin?' });
+    // The pill row is NOT replaced — the panel lives in the same surface.
+    await expect(pill).toBeVisible();
+    await expect(pill).toHaveAttribute('aria-expanded', 'true');
+    // Modal contract: initial focus + scroll lock.
+    await expect(body.getByRole('button', { name: 'Kapat' })).toHaveFocus();
+    await expect(document.body).toHaveStyle({ overflow: 'hidden' });
+    // The panel carries the card grid.
+    await expect(within(dialog).getByRole('button', { name: /^İlanlar$/ })).toBeInTheDocument();
+
+    // Escape dismisses and returns focus to the pill; the scroll lock is released.
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(pill).toHaveAttribute('aria-expanded', 'false'));
+    await expect(pill).toHaveFocus();
+    await expect(document.body).not.toHaveStyle({ overflow: 'hidden' });
+  },
+};
+
+/**
+ * The launcher states where you are in words — "Şu an: <yol> · <saat>" — with a
+ * steady green dot marking it live. No pulse: a loop that never resolves keeps
+ * asking for attention the reading does not need. `now` freezes the clock.
+ */
+export const StatusLine: Story = {
+  args: { now: new Date('2026-07-24T13:24:00') },
+  parameters: { viewport: { defaultViewport: 'bpXl' } },
+  play: async () => {
+    const body = within(document.body);
+    const pill = body.getByRole('button', { name: LAUNCHER });
+    // Visible: the trail and the clock, both readable without hovering anything.
+    await expect(pill).toHaveTextContent('Şu an:');
+    await expect(pill).toHaveTextContent('Genel Bakış');
+    await expect(pill).toHaveTextContent('13:24');
+    // The accessible name carries the same reading as one sentence.
+    await expect(pill).toHaveAccessibleName(/Şu an: Genel Bakış, saat 13:24/);
   },
 };
 
