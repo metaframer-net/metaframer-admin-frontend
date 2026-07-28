@@ -99,7 +99,9 @@ function ClusterLayer({
     map.addLayer(group);
 
     if (!hasCenter && markers.length > 0) {
-      map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 14 });
+      // `animate: false` — the initial fit should not animate, and it also avoids
+      // a Leaflet zoom-transition callback firing after unmount (`_leaflet_pos`).
+      map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 14, animate: false });
     }
 
     return () => {
