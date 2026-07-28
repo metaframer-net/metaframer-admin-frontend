@@ -24,6 +24,13 @@ import { getAuditLog, type AuditEntry } from '@/lib/audit';
 import { usePermission, useSession } from '@/lib/permissions/permission-context';
 import { usePermissionMatrix } from '@/lib/permissions/permission-store';
 import { applyIntent, parseCommand, selectApprovable, type Intent } from '@/lib/ai';
+// PERF NOTE: this panel is reached eagerly (AppShell → AssistantDock → AssistantPanel),
+// so anything imported here ships in the initial bundle. The two listings-API hooks below
+// are dep-free and tiny (~3 KB), so the cost is negligible today. Do NOT add HEAVY feature
+// imports here (recharts/leaflet-backed views, large query modules): if this panel ever
+// needs weight, defer it behind the assistant `open` state instead — measured naive
+// React.lazy of the whole panel REGRESSED the entry chunk (+10 KB) because Vite hoists the
+// then-shared shell modules back into entry, so split at the heavy import, not the panel.
 import { useListings } from '@/features/listings/api/queries';
 import { useAiApproveListings } from '@/features/listings/api/mutations';
 import { AI_APPROVE_PERMISSION, AI_QUEUE_QUERY, buildAssistantContext } from './assistant-context';
