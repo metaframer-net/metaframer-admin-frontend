@@ -525,10 +525,20 @@
   }
 
   /* Coarse pointers have no hover stage at all, so the pill starts engaged rather
-     than waiting for a hover that can never arrive. */
+     than waiting for a hover that can never arrive — AND its reveals must open
+     with it. Width alone is not enough: a `.dock-reveal` left at
+     `pointer-events: none` / `0fr` (e.g. the user menu) would be untappable on
+     touch, a dead end for a control with no other path in dock mode. The
+     `[data-open] .dock-reveal-nav` suppression still wins by specificity, so the
+     nav strip stays hidden once the panel is open. */
   @media (hover: none), (pointer: coarse) {
     .dock-pill {
       width: var(--dock-w-engaged);
+    }
+    .dock-pill .dock-reveal {
+      grid-template-columns: 1fr;
+      opacity: 1;
+      pointer-events: auto;
     }
   }
 
@@ -598,6 +608,40 @@
     .dock-command-center [data-slot='dialog-close']:active {
       transform: none;
     }
+  }
+
+  /* ── Command center — fluid module-grid ↔ sub-navigation stack ──────────────
+     Two views share one clipped, height-animated port. The shown layer rests at
+     x:0 / opacity:1; the other is parked ±16px and faded out (and `inert` in the
+     DOM, so it holds no focus). The port's height is measured per shown layer in
+     JS (CommandCenter) and interpolated here, so grid → sub grows or shrinks in
+     one continuous move rather than snapping. Reduced motion is handled by the
+     base layer (durations → ~0); the parked transforms never flash because those
+     layers are transparent. */
+  .pc-stack {
+    position: relative;
+    overflow: hidden;
+    transition: height var(--duration-slow) var(--ease-emphasized);
+  }
+  .pc-layer {
+    position: absolute;
+    inset: 0 0 auto 0;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity var(--duration-base) var(--ease-standard),
+      transform var(--duration-slow) var(--ease-emphasized);
+  }
+  .pc-layer[data-role='grid'] {
+    transform: translateX(-1rem);
+  }
+  .pc-layer[data-role='sub'] {
+    transform: translateX(1rem);
+  }
+  .pc-layer[data-shown='true'] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
   }
 }
 

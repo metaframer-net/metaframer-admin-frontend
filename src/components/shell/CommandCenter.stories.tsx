@@ -22,13 +22,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Card grid + the extras strip (identity, quick commands) + the NL search strip. */
+/** Card grid + the quick-command chip row + the NL command bar. */
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    // Identity lives in the extras strip.
-    await expect(c.getByText('Ahmet Yönetici')).toBeInTheDocument();
-    await expect(c.getByText('Süper Admin')).toBeInTheDocument();
+    // Quick-command chip row (theme, recent, assistant, layout, create).
+    await expect(c.getByRole('button', { name: 'AI Asistanı' })).toBeInTheDocument();
+    await expect(c.getByRole('button', { name: 'Yeni ilan' })).toBeInTheDocument();
     // A leaf module is a real link (middle-click / new tab work); the active one
     // (route `/`) is marked.
     const overview = c.getByRole('link', { name: /Genel Bakış/ });
@@ -36,6 +36,9 @@ export const Default: Story = {
     await expect(overview).toHaveAttribute('href', '/');
     // A module that owns children is a disclosure button, not a link.
     await expect(c.getByRole('button', { name: /^İlanlar$/ })).not.toHaveAttribute('aria-current');
+    // Cards carry the module's own blurb (real nav-schema meta) under the label —
+    // decorative (aria-hidden), so it never pollutes the control's accessible name.
+    await expect(c.getByText('İlan yönetimi ve moderasyon kuyruğu')).toBeInTheDocument();
     await expect(c.getByText('AI hazır')).toBeInTheDocument();
   },
 };
@@ -50,19 +53,14 @@ export const SubNavigation: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await userEvent.click(c.getByRole('button', { name: /^İlanlar$/ }));
-    const back = c.getByRole('button', { name: 'Tüm modüller' });
+    const back = c.getByRole('button', { name: 'Geri' });
     await expect(back).toHaveFocus();
-    // The module's own landing page leads its children; sub items are links.
-    await expect(c.getByRole('link', { name: 'İlanlar — genel' })).toHaveAttribute(
-      'href',
-      '/listings',
-    );
-    await expect(c.getByRole('link', { name: 'Moderasyon Kuyruğu' })).toHaveAttribute(
+    // The module's children render as a vertical list of real links.
+    await expect(c.getByRole('link', { name: /Tüm İlanlar/ })).toHaveAttribute('href', '/listings');
+    await expect(c.getByRole('link', { name: /Moderasyon Kuyruğu/ })).toHaveAttribute(
       'href',
       '/listings/moderation',
     );
-    // Other modules stay one click away in the peek strip (this one has children).
-    await expect(c.getByRole('button', { name: /Kullanıcılar & Ofisler/ })).toBeInTheDocument();
     // Back returns to the grid and parks focus on the search field.
     await userEvent.click(back);
     await expect(c.getByLabelText('Modül ara')).toHaveFocus();
@@ -94,7 +92,7 @@ export const NaturalLanguage: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await userEvent.type(c.getByLabelText('Doğal dil komutu'), 'ilanlara git');
-    await userEvent.click(c.getByRole('button', { name: /Yorumla/ }));
+    await userEvent.click(c.getByRole('button', { name: 'Komutu çalıştır' }));
     // Proposed navigate intent with a confirm button (guardrail: confirm-before-apply).
     await expect(c.getByText('Sayfaya git')).toBeInTheDocument();
     await expect(c.getByRole('button', { name: /Git/ })).toBeInTheDocument();
