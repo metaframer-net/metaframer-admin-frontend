@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Command, type LucideIcon } from 'lucide-react';
 
@@ -22,18 +22,53 @@ interface DockItem {
 /* macOS-style magnification tuning (our own values). */
 const BASE = 44; // icon box size (px) — meets the 44px touch-target rule at base scale
 const GAP = 8;
-const MIN_SCALE = 1;
-const MAX_SCALE = 1.55;
+const MIN = 1;
+const MAX = 1.5;
 const EFFECT = 170; // proximity falloff window along the main axis (px)
+/* Dual-speed lerp (matches the GlassDock reference): quicker while the pointer drives
+   the dock, softer as it eases back to rest. Applied per-frame in the rAF loop. */
+const LERP_IN = 0.2;
+const LERP_OUT = 0.12;
+/* How close (px) the pointer must get to the collapsed hint before the dock opens — a
+   proximity zone so you don't have to land exactly on the thin hint bar. */
+const PROXIMITY = 64;
+
+/** Resting center of icon i along the main axis (no magnification). */
+function restCenter(i: number): number {
+  return i * (BASE + GAP) + BASE / 2;
+}
+
+/** Cosine proximity falloff → per-icon scale for a given pointer position (or all
+ * MIN when the pointer is away / null). */
+function scalesFor(pos: number | null, count: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < count; i += 1) {
+    if (pos === null) {
+      out.push(MIN);
+      continue;
+    }
+    const center = restCenter(i);
+    const minX = pos - EFFECT / 2;
+    const maxX = pos + EFFECT / 2;
+    if (center < minX || center > maxX) {
+      out.push(MIN);
+      continue;
+    }
+    const theta = ((center - minX) / EFFECT) * 2 * Math.PI;
+    const f = (1 - Math.cos(theta)) / 2;
+    out.push(MIN + f * (MAX - MIN));
+  }
+  return out;
+}
 
 /** Icon center positions along the main axis, spaced by their (magnified) sizes. */
 function positionsFromScales(scales: number[]): number[] {
-  let x = 0;
+  let run = 0;
   const out: number[] = [];
   for (const s of scales) {
     const w = BASE * s;
-    out.push(x + w / 2);
-    x += w + GAP;
+    out.push(run + w / 2);
+    run += w + GAP;
   }
   return out;
 }
@@ -79,15 +114,42 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/** A single icon tile — a nav link or the ⌘K button, with its module label. */
-function DockTile({ item, onNavigate }: { item: DockItem; onNavigate?: (() => void) | undefined }) {
+/** A single icon tile — a nav link or the ⌘K button. No background fill: the sliding
+ * lens is the sole positional highlight, so nothing else "pops" a competing circle. */
+function DockTile({
+  item,
+  edge,
+  onNavigate,
+}: {
+  item: DockItem;
+  edge: DockEdge;
+  onNavigate?: (() => void) | undefined;
+}) {
   const Icon = item.icon;
-  const inner = <Icon className="size-5" aria-hidden="true" />;
+  // The always-on lens marks the icon nearest the cursor; while it is following the
+  // pointer/keyboard focus elsewhere, the active route needs a NON-color cue too
+  // (Golden Rule: color is never the sole signal). A tiny persistent dot on the outer
+  // edge provides that — dock-idiomatic (macOS "running app" dot).
+  const dotPos =
+    edge === 'bottom'
+      ? 'bottom-0.5 left-1/2 -translate-x-1/2'
+      : edge === 'left'
+        ? 'left-0.5 top-1/2 -translate-y-1/2'
+        : 'right-0.5 top-1/2 -translate-y-1/2';
+  const inner = (
+    <>
+      <Icon className="size-5" aria-hidden="true" />
+      {item.active && (
+        <span
+          aria-hidden="true"
+          className={cn('bg-primary pointer-events-none absolute size-1 rounded-full', dotPos)}
+        />
+      )}
+    </>
+  );
   const cls = cn(
-    'focus-visible:ring-ring flex size-full items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2',
-    item.active
-      ? 'bg-primary/15 text-primary'
-      : 'text-glass-foreground/80 hover:bg-accent/40 hover:text-glass-foreground',
+    'focus-visible:ring-ring relative flex size-full items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2',
+    item.active ? 'text-primary' : 'text-glass-foreground/80 hover:text-glass-foreground',
   );
   return item.to ? (
     <NavLink
@@ -120,169 +182,268 @@ function DockTile({ item, onNavigate }: { item: DockItem; onNavigate?: (() => vo
 }
 
 /**
- * Horizontal magnifying dock (bottom edge) — macOS-style: icons magnify toward the
- * cursor (cosine proximity falloff derived directly from the pointer; CSS transitions
- * smooth it — no rAF loop). On touch / reduced-motion the pointer never drives it, so
- * it renders as a calm, static icon row. Reinterprets the reference in OUR glass.
+ * Magnifying dock for ALL three edges (bottom = horizontal, left/right = vertical).
+ * macOS-style cosine magnification toward the cursor PLUS an always-visible "lens"
+ * indicator that reinterprets the GlassDock reference: at rest it sits on the active
+ * item; as the pointer moves it GLIDES to the nearest icon (its opacity never
+ * animates — no "appearing" circle). A single requestAnimationFrame lerp loop drives
+ * both the magnification and the lens glide (LERP_IN while pointing, LERP_OUT easing
+ * back), so there is no stepped CSS-transition feel. The loop runs only while the dock
+ * is in motion and cancels itself once settled. Under reduced-motion / touch (no
+ * pointer) it is a calm static row: no magnify, and the lens snaps (no glide) to the
+ * hovered or active item. Reinterpreted in OUR glass + tokens (Golden Rule 1/2).
  */
-function MagnifyDock({ items, onNavigate }: { items: DockItem[]; onNavigate?: (() => void) | undefined }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const lastMove = useRef(0);
-  const reduced = usePrefersReducedMotion();
-  const [mouseX, setMouseX] = useState<number | null>(null);
-  const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
-
-  // Scales + positions are derived directly from the pointer (no rAF loop, no per-frame
-  // state churn) — CSS transitions on the tiles smooth the magnify. Reduced-motion or
-  // touch (no mousemove) → mouseX stays null → a calm static row.
-  const active = reduced ? null : mouseX;
-  const scales = items.map((_, i) => {
-    if (active === null) return MIN_SCALE;
-    const center = i * (BASE + GAP) + BASE / 2;
-    const minX = active - EFFECT / 2;
-    const maxX = active + EFFECT / 2;
-    if (center < minX || center > maxX) return MIN_SCALE;
-    const theta = ((center - minX) / EFFECT) * 2 * Math.PI;
-    const f = (1 - Math.cos(theta)) / 2;
-    return MIN_SCALE + f * (MAX_SCALE - MIN_SCALE);
-  });
-  const positions = positionsFromScales(scales);
-  // Track box uses the RESTING layout only (never magnifies), so the glass pill stays
-  // stable while the icons breathe — magnified tiles overflow (nav is overflow:visible).
-  // `offset` re-centers the magnified group in the resting track so it spills evenly to
-  // both sides instead of pushing everything rightward.
-  const contentWidth = items.length * (BASE + GAP) - GAP;
-  const magnifiedExtent = positions.length
-    ? (positions[positions.length - 1] ?? 0) + (BASE * (scales[scales.length - 1] ?? MIN_SCALE)) / 2
-    : contentWidth;
-  const offset = (contentWidth - magnifiedExtent) / 2;
-
-  // The icon closest to the cursor (or the keyboard-focused one) gets a floating
-  // label with its module name — so keyboard users see the same affordance as mouse.
-  const pointerIdx =
-    active === null
-      ? null
-      : positions.reduce(
-          (best, p, i) => (Math.abs(p - active) < Math.abs((positions[best] ?? 0) - active) ? i : best),
-          0,
-        );
-  const labelIdx = pointerIdx ?? focusedIdx;
-  const labelItem = labelIdx !== null ? items[labelIdx] : undefined;
-  const labelPos = labelIdx !== null ? (positions[labelIdx] ?? 0) : 0;
-
-  const onMove = (e: React.MouseEvent) => {
-    if (reduced) return;
-    const now = performance.now();
-    if (now - lastMove.current < 16) return;
-    lastMove.current = now;
-    const rect = trackRef.current?.getBoundingClientRect();
-    if (rect) setMouseX(e.clientX - rect.left);
-  };
-
-  return (
-    <div
-      ref={trackRef}
-      className="relative"
-      style={{ width: contentWidth, height: BASE }}
-      onMouseMove={onMove}
-      onMouseLeave={() => setMouseX(null)}
-    >
-      {labelItem && labelIdx !== null && (
-        <span
-          key={labelItem.key}
-          aria-hidden="true"
-          className="bg-popover text-popover-foreground border-border animate-fade-in pointer-events-none absolute bottom-full z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs shadow-md"
-          style={{ left: labelPos + offset }}
-        >
-          {labelItem.label}
-        </span>
-      )}
-      {items.map((item, i) => {
-        const scale = scales[i] ?? MIN_SCALE;
-        const pos = (positions[i] ?? 0) + offset;
-        return (
-          <div
-            key={item.key}
-            onFocus={() => setFocusedIdx(i)}
-            onBlur={() => setFocusedIdx((cur) => (cur === i ? null : cur))}
-            className="absolute bottom-0 transition-[transform,left] duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none"
-            style={{
-              left: pos - BASE / 2,
-              width: BASE,
-              height: BASE,
-              transform: `scale(${scale})`,
-              transformOrigin: '50% 100%',
-              zIndex: Math.round(scale * 10),
-            }}
-          >
-            <DockTile item={item} onNavigate={onNavigate} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Vertical dock (left / right edges) — static icons with a sliding highlight that
- * follows the hovered (or active) item, plus a gentle hover scale. Mirrors the
- * reference's vertical dock; our glass, our tokens.
- */
-function SideDock({
+function MagnifyDock({
   items,
   onNavigate,
-  labelSide,
+  edge,
 }: {
   items: DockItem[];
   onNavigate?: (() => void) | undefined;
-  labelSide: 'left' | 'right';
+  edge: DockEdge;
 }) {
-  const [hovered, setHovered] = useState<number | null>(null);
+  const axis: 'x' | 'y' = edge === 'bottom' ? 'x' : 'y';
+  const reduced = usePrefersReducedMotion();
+  // -1 when the current route matches no dock item — the lens then shows nothing at
+  // rest (mirrors the old SideDock's "no highlight when nothing is active").
   const activeIdx = items.findIndex((i) => i.active);
-  const target = hovered ?? activeIdx;
-  const STEP = BASE + GAP;
-  const hoveredItem = hovered !== null ? items[hovered] : undefined;
+  const count = items.length;
+  const restExtent = count * (BASE + GAP) - GAP;
+
+  const trackRef = useRef<HTMLDivElement>(null);
+  const lensRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLSpanElement>(null);
+  const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useLayoutEffect(() => {
+    const trackEl = trackRef.current;
+    const lensEl = lensRef.current;
+    const tipEl = tipRef.current;
+    if (!trackEl || !lensEl || !tipEl) return;
+    // Re-bind to non-null-typed consts so the nested frame/paint closures (where
+    // control-flow narrowing does not reach) see them as never-null.
+    const track: HTMLDivElement = trackEl;
+    const lens: HTMLSpanElement = lensEl;
+    const tip: HTMLSpanElement = tipEl;
+    const tiles = tileRefs.current;
+
+    // Animated state, mutated in place across frames (no React re-render per frame).
+    let scales: number[] = items.map(() => MIN);
+    let lensCenter = restCenter(activeIdx >= 0 ? activeIdx : 0);
+    let lensScale = activeIdx >= 0 ? MIN : 0;
+    let pointer: number | null = null;
+    let running = false;
+    let raf = 0;
+
+    /** Magnified centers for the current `scales`, re-centered so the group spills
+     * evenly to both sides of the resting track instead of drifting one way. */
+    function layout(): number[] {
+      const p = positionsFromScales(scales);
+      const lastP = p[p.length - 1] ?? 0;
+      const lastS = scales[scales.length - 1] ?? MIN;
+      const ext = p.length ? lastP + (BASE * lastS) / 2 : restExtent;
+      const off = (restExtent - ext) / 2;
+      return p.map((v) => v + off);
+    }
+
+    // Index of the icon whose (magnified) center is closest to pointer `p`.
+    function nearest(centers: number[], p: number): number {
+      let idx = 0;
+      let best = Infinity;
+      for (let i = 0; i < centers.length; i += 1) {
+        const d = Math.abs((centers[i] ?? 0) - p);
+        if (d < best) {
+          best = d;
+          idx = i;
+        }
+      }
+      return idx;
+    }
+
+    function place(el: HTMLElement, center: number, scale: number) {
+      if (axis === 'x') {
+        el.style.left = `${center - BASE / 2}px`;
+        el.style.bottom = '0';
+        el.style.transformOrigin = '50% 100%';
+      } else {
+        el.style.top = `${center - BASE / 2}px`;
+        if (edge === 'left') {
+          el.style.left = '0';
+          el.style.transformOrigin = '0% 50%';
+        } else {
+          el.style.right = '0';
+          el.style.transformOrigin = '100% 50%';
+        }
+      }
+      el.style.transform = `scale(${scale})`;
+    }
+
+    function paint(centers: number[]) {
+      for (let i = 0; i < tiles.length; i += 1) {
+        const t = tiles[i];
+        if (!t) continue;
+        const s = scales[i] ?? MIN;
+        place(t, centers[i] ?? restCenter(i), s);
+        t.style.zIndex = String(Math.round(s * 10));
+      }
+      place(lens, lensCenter, lensScale);
+    }
+
+    function showTip(idx: number, center: number) {
+      const item = items[idx];
+      if (!item) return;
+      tip.textContent = item.label;
+      tip.style.opacity = '1';
+      if (axis === 'x') {
+        tip.style.left = `${center}px`;
+        tip.style.bottom = `${BASE + 12}px`;
+        tip.style.transform = 'translateX(-50%)';
+      } else {
+        tip.style.top = `${center}px`;
+        tip.style.transform = 'translateY(-50%)';
+        if (edge === 'left') tip.style.left = `${BASE + 14}px`;
+        else tip.style.right = `${BASE + 14}px`;
+      }
+    }
+    function hideTip() {
+      tip.style.opacity = '0';
+    }
+
+    function frame() {
+      const k = pointer !== null ? LERP_IN : LERP_OUT;
+      const wanted = scalesFor(pointer, count);
+      let moving = false;
+      for (let i = 0; i < count; i += 1) {
+        const s = scales[i] ?? MIN;
+        const w = wanted[i] ?? MIN;
+        const next = s + (w - s) * k;
+        if (Math.abs(w - next) > 0.001) moving = true;
+        scales[i] = next;
+      }
+      const centers = layout();
+      // Lens target: the hovered icon while pointing, else the active item — or NOTHING
+      // (idx < 0) when the route matches no dock item, in which case the lens eases to
+      // scale 0 (hidden) instead of falsely marking the first icon.
+      const idx = pointer !== null ? nearest(centers, pointer) : activeIdx;
+      const hasTarget = idx >= 0;
+      const targetCenter = hasTarget ? (centers[idx] ?? restCenter(idx)) : lensCenter;
+      const targetScale = hasTarget ? (scales[idx] ?? MIN) : 0;
+      lensCenter += (targetCenter - lensCenter) * k;
+      lensScale += (targetScale - lensScale) * k;
+      if (Math.abs(targetCenter - lensCenter) > 0.3 || Math.abs(targetScale - lensScale) > 0.002) {
+        moving = true;
+      }
+      paint(centers);
+      if (pointer !== null && hasTarget) showTip(idx, targetCenter);
+      else hideTip();
+      // Reschedule ONLY while something is still animating. Once converged the painted
+      // state is already correct, so we let the loop go idle even if the cursor is still
+      // parked over the dock — a fresh mousemove/focusin calls ensureLoop() again. (Without
+      // this, resting the pointer would spin rAF at 60fps forever, repainting identical
+      // values on a persistent shell component.)
+      if (moving) raf = requestAnimationFrame(frame);
+      else running = false;
+    }
+    function ensureLoop() {
+      if (!running) {
+        running = true;
+        raf = requestAnimationFrame(frame);
+      }
+    }
+
+    /** Reduced-motion / touch: no magnify, no glide — the lens snaps to `idx`, or hides
+     * (scale 0) when `idx < 0` (no active item). */
+    function snap(idx: number) {
+      scales = items.map(() => MIN);
+      const centers = layout();
+      if (idx >= 0) {
+        lensCenter = restCenter(idx);
+        lensScale = MIN;
+      } else {
+        lensScale = 0;
+      }
+      paint(centers);
+      if (pointer !== null && idx >= 0) showTip(idx, lensCenter);
+      else hideTip();
+    }
+
+    // Initial rest paint (pre-browser-paint via useLayoutEffect → no first-frame flash):
+    // lens on the active item, or hidden when nothing is active.
+    if (reduced) snap(activeIdx);
+    else paint(layout());
+
+    const onMove = (e: MouseEvent) => {
+      const r = track.getBoundingClientRect();
+      const p = axis === 'x' ? e.clientX - r.left : e.clientY - r.top;
+      pointer = p;
+      if (reduced) snap(nearest(layout(), p));
+      else ensureLoop();
+    };
+    const onLeave = () => {
+      pointer = null;
+      if (reduced) snap(activeIdx);
+      else ensureLoop();
+    };
+    // Keyboard: focusing a tile drives the same magnify/lens toward that icon, so
+    // keyboard users get the identical positional cue + floating label as the mouse.
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as Node;
+      const idx = tiles.findIndex((t) => t?.contains(target));
+      if (idx < 0) return;
+      pointer = restCenter(idx);
+      if (reduced) snap(idx);
+      else ensureLoop();
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      if (track.contains(e.relatedTarget as Node | null)) return;
+      pointer = null;
+      if (reduced) snap(activeIdx);
+      else ensureLoop();
+    };
+
+    track.addEventListener('mousemove', onMove);
+    track.addEventListener('mouseleave', onLeave);
+    track.addEventListener('focusin', onFocusIn);
+    track.addEventListener('focusout', onFocusOut);
+    return () => {
+      cancelAnimationFrame(raf);
+      track.removeEventListener('mousemove', onMove);
+      track.removeEventListener('mouseleave', onLeave);
+      track.removeEventListener('focusin', onFocusIn);
+      track.removeEventListener('focusout', onFocusOut);
+    };
+  }, [items, edge, axis, reduced, activeIdx, count, restExtent]);
+
+  const trackStyle =
+    axis === 'x'
+      ? { width: restExtent, height: BASE }
+      : { height: restExtent, width: BASE };
 
   return (
-    <div
-      className="relative flex flex-col items-center gap-2"
-      onMouseLeave={() => setHovered(null)}
-    >
-      {hoveredItem && hovered !== null && (
-        <span
-          key={hoveredItem.key}
-          aria-hidden="true"
-          className={cn(
-            'bg-popover text-popover-foreground border-border animate-fade-in pointer-events-none absolute z-50 -translate-y-1/2 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs shadow-md',
-            labelSide === 'right' ? 'left-full ml-3' : 'right-full mr-3',
-          )}
-          style={{ top: hovered * STEP + BASE / 2 }}
-        >
-          {hoveredItem.label}
-        </span>
-      )}
-      {target >= 0 && (
-        <div
-          aria-hidden="true"
-          className="bg-primary/10 absolute left-1/2 rounded-full transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] motion-reduce:transition-none"
-          style={{
-            top: 0,
-            width: BASE,
-            height: BASE,
-            transform: `translate(-50%, ${target * STEP}px)`,
-          }}
-        />
-      )}
-      {items.map((item, idx) => (
+    <div ref={trackRef} className="relative" style={trackStyle}>
+      {/* Always-on selection lens — decorative; the tiles carry the accessible names. */}
+      <span
+        ref={lensRef}
+        aria-hidden="true"
+        className="bg-glass-lens shadow-lens pointer-events-none absolute z-0 rounded-full"
+        style={{ width: BASE, height: BASE }}
+      />
+      {/* Floating label for the icon nearest the cursor / keyboard focus. */}
+      <span
+        ref={tipRef}
+        aria-hidden="true"
+        className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs opacity-0 shadow-md transition-opacity duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none"
+      />
+      {items.map((item, i) => (
         <div
           key={item.key}
-          onMouseEnter={() => setHovered(idx)}
-          onFocus={() => setHovered(idx)}
-          onBlur={() => setHovered((cur) => (cur === idx ? null : cur))}
-          className="relative z-[1] transition-transform duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
+          ref={(el) => {
+            tileRefs.current[i] = el;
+          }}
+          className="absolute"
           style={{ width: BASE, height: BASE }}
         >
-          <DockTile item={item} onNavigate={onNavigate} />
+          <DockTile item={item} edge={edge} onNavigate={onNavigate} />
         </div>
       ))}
     </div>
@@ -349,8 +510,8 @@ const SHELL: Record<DockEdge, EdgeShell> = {
 /**
  * A collapsible edge navigation dock (dock layout, desktop AND mobile). Collapsed it is
  * a small rich-glass hint tab hugging the edge; hover / keyboard-focus / tap slides the
- * dock in. The revealed bottom dock is a macOS-style magnifying dock (icons grow toward
- * the cursor); the left/right docks are vertical rails with a sliding hover highlight.
+ * dock in. The revealed dock is a macOS-style magnifying dock on ALL three edges (icons
+ * grow toward the cursor) with an always-on lens that glides to the hovered/active icon.
  * Up to three frame the viewport, each independently flag-gated from Settings; all share
  * one nav source (usePrimaryNav). Golden Rule 1: reinterpreted in OUR glass + motion
  * tokens — NOT a clone of the reference's liquid-glass chrome.
@@ -360,10 +521,52 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
   const cfg = SHELL[edge];
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  // Set while we programmatically move focus back to the hint on Escape, so the hint's
+  // own focus handler does not re-open the dock during that restore.
+  const suppressOpenRef = useRef(false);
+  // Read inside the window mousemove / blur handlers without re-subscribing them each
+  // render: a live mirror of `open`, and whether the pointer is within the proximity zone.
+  const openRef = useRef(false);
+  const nearRef = useRef(false);
   const stageId = `edge-dock-stage-${edge}`;
 
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Proximity open/close: open when the pointer approaches within PROXIMITY px of the
+  // hint (or, while open, the revealed panel), and close when it moves beyond that zone —
+  // unless keyboard focus is still inside. This only READS the pointer position (no
+  // invisible overlay), so it never blocks clicks on the content underneath. Touch and
+  // keyboard paths are unaffected (no mousemove fires on touch).
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const within = (r: DOMRect, x: number, y: number) =>
+      x >= r.left - PROXIMITY &&
+      x <= r.right + PROXIMITY &&
+      y >= r.top - PROXIMITY &&
+      y <= r.bottom + PROXIMITY;
+    let last = 0;
+    const onMove = (e: MouseEvent) => {
+      const now = performance.now();
+      if (now - last < 40) return; // throttle the getBoundingClientRect reads
+      last = now;
+      let near = within(wrapper.getBoundingClientRect(), e.clientX, e.clientY);
+      if (!near && openRef.current && stageRef.current) {
+        near = within(stageRef.current.getBoundingClientRect(), e.clientX, e.clientY);
+      }
+      nearRef.current = near;
+      if (near) setOpen(true);
+      else if (!wrapper.contains(document.activeElement)) setOpen(false);
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
   const closeIfOutside = (next: Element | null) => {
-    if (!wrapperRef.current?.contains(next)) setOpen(false);
+    if (!wrapperRef.current?.contains(next) && !nearRef.current) setOpen(false);
   };
 
   return (
@@ -371,12 +574,16 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
       ref={wrapperRef}
       className={cn('fixed z-30', cfg.wrapper)}
       onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => closeIfOutside(document.activeElement)}
       onBlur={(e) => closeIfOutside(e.relatedTarget)}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {
+          // Close AND restore focus to the hint — but guard the hint's focus handler so
+          // it does not re-open the dock (otherwise Escape is a no-op once focus has
+          // tabbed into the tiles). The focus fires synchronously inside this window.
+          suppressOpenRef.current = true;
           setOpen(false);
           wrapperRef.current?.querySelector<HTMLButtonElement>('[data-slot="edge-dock-hint"]')?.focus();
+          suppressOpenRef.current = false;
         }
       }}
       data-entity="dock"
@@ -393,7 +600,9 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
         aria-controls={stageId}
         aria-label={`Gezinme dock’u (${cfg.label}) — aç`}
         onClick={() => setOpen(true)}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          if (!suppressOpenRef.current) setOpen(true);
+        }}
         className={cn(
           'focus-visible:ring-ring group flex rounded-md outline-none focus-visible:ring-2',
           cfg.hintBox,
@@ -416,6 +625,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
       {/* Stage — the revealed dock. Adjacent to the hint (no gap). `inert` when collapsed
           so its links stay out of the tab order + a11y tree while it fades. */}
       <div
+        ref={stageRef}
         id={stageId}
         inert={!open}
         className={cn(
@@ -433,15 +643,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
           )}
           style={{ overflow: 'visible' }}
         >
-          {edge === 'bottom' ? (
-            <MagnifyDock items={items} onNavigate={() => setOpen(false)} />
-          ) : (
-            <SideDock
-              items={items}
-              onNavigate={() => setOpen(false)}
-              labelSide={edge === 'left' ? 'right' : 'left'}
-            />
-          )}
+          <MagnifyDock items={items} onNavigate={() => setOpen(false)} edge={edge} />
         </nav>
       </div>
     </div>
