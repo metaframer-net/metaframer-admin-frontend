@@ -45,7 +45,10 @@ export const SortsByColumn: Story = {
   render: () => <DataTableDemo />,
   play: async ({ canvas }) => {
     // Numeric columns sort descending on first click (TanStack sortDescFirst).
-    await userEvent.click(within(canvas.getByRole('columnheader', { name: /Fiyat/ })).getByRole('button'));
+    // The Fiyat header now has two buttons (filter funnel + sort) — target sort by name.
+    await userEvent.click(
+      within(canvas.getByRole('columnheader', { name: /Fiyat/ })).getByRole('button', { name: 'Fiyat' }),
+    );
     await waitFor(() =>
       expect(canvas.getByRole('columnheader', { name: /Fiyat/ })).toHaveAttribute('aria-sort', 'descending'),
     );
@@ -56,6 +59,18 @@ export const FiltersByFacet: Story = {
   render: () => <DataTableDemo />,
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Durum filtresi' }));
+    const option = await within(document.body).findByRole('checkbox', { name: 'Yayında' });
+    await userEvent.click(option);
+    await expect(await canvas.findByText('Durum: Yayında')).toBeInTheDocument();
+  },
+};
+
+export const FiltersByColumnHeader: Story = {
+  render: () => <DataTableDemo />,
+  play: async ({ canvas }) => {
+    // The funnel sits on the LEFT of the column label and writes to the same
+    // URL-synced state as the toolbar filter → the chip appears just the same.
+    await userEvent.click(canvas.getByRole('button', { name: 'Durum sütununu filtrele' }));
     const option = await within(document.body).findByRole('checkbox', { name: 'Yayında' });
     await userEvent.click(option);
     await expect(await canvas.findByText('Durum: Yayında')).toBeInTheDocument();

@@ -47,6 +47,23 @@ const STATUS_VARIANT: Record<DemoRow['status'], 'success' | 'warning' | 'destruc
   rejected: 'destructive',
 };
 
+const statusFilter: FilterConfig = {
+  id: 'status',
+  label: 'Durum',
+  kind: 'faceted',
+  multiple: true,
+  options: STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], count: DEMO_ROWS.filter((r) => r.status === s).length })),
+};
+const categoryFilter: FilterConfig = {
+  id: 'category',
+  label: 'Kategori',
+  kind: 'faceted',
+  multiple: true,
+  options: CATEGORIES.map((c) => ({ value: c, label: c, count: DEMO_ROWS.filter((r) => r.category === c).length })),
+};
+const priceFilter: FilterConfig = { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺' };
+const filters: FilterConfig[] = [statusFilter, categoryFilter, priceFilter];
+
 export const demoColumns: ColumnDef<DemoRow>[] = [
   {
     id: 'select',
@@ -86,10 +103,11 @@ export const demoColumns: ColumnDef<DemoRow>[] = [
     ),
   },
   { accessorKey: 'title', header: 'Başlık', cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span> },
-  { accessorKey: 'category', header: 'Kategori' },
+  { accessorKey: 'category', header: 'Kategori', meta: { filter: categoryFilter } },
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => {
       const s = getValue<DemoRow['status']>();
       return <Badge variant={STATUS_VARIANT[s]}>{STATUS_LABEL[s]}</Badge>;
@@ -99,6 +117,7 @@ export const demoColumns: ColumnDef<DemoRow>[] = [
   {
     accessorKey: 'price',
     header: 'Fiyat',
+    meta: { filter: priceFilter },
     cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>().toLocaleString('tr-TR')} ₺</span>,
   },
   {
@@ -106,24 +125,6 @@ export const demoColumns: ColumnDef<DemoRow>[] = [
     header: 'm²',
     cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span>,
   },
-];
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s], count: DEMO_ROWS.filter((r) => r.status === s).length })),
-  },
-  {
-    id: 'category',
-    label: 'Kategori',
-    kind: 'faceted',
-    multiple: true,
-    options: CATEGORIES.map((c) => ({ value: c, label: c, count: DEMO_ROWS.filter((r) => r.category === c).length })),
-  },
-  { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺' },
 ];
 
 /** Client-side stand-in for the server: filters/sorts/paginates DEMO_ROWS. */

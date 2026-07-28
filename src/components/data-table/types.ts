@@ -1,3 +1,5 @@
+import type { RowData } from '@tanstack/react-table';
+
 import type { SortSpec } from '@/lib/api/types';
 
 /** A faceted filter option with an optional live count from the API. */
@@ -37,4 +39,16 @@ export interface TableQuery {
   sort: SortSpec[];
   filters: Record<string, string | string[]>;
   q: string;
+}
+
+declare module '@tanstack/react-table' {
+  /**
+   * Column-level opt-in for a header filter (funnel popover). When set, the
+   * DataTable renders a filter affordance on the LEFT of the column header that
+   * writes to the same URL-synced filter state as the toolbar FilterBar.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    filter?: FilterConfig;
+  }
 }

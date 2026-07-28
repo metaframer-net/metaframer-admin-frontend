@@ -20,6 +20,7 @@ import { ErrorState } from '@/components/feedback/ErrorState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DensityToggle } from '@/components/shell/DensityToggle';
 import { ColumnVisibility } from './ColumnVisibility';
+import { ColumnHeaderFilter } from './ColumnHeaderFilter';
 import { ExportMenu, type ExportFormat, type ExportScope } from './ExportMenu';
 import { DataTablePagination } from './DataTablePagination';
 import { BulkActionBar } from './BulkActionBar';
@@ -274,6 +275,10 @@ export function DataTable<TData>({
                               className="hover:bg-border absolute right-0 top-0 h-full w-1 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:-left-5 after:right-0 after:content-['']"
                               aria-hidden="true"
                             />
+                          )}
+                          {/* Column filter funnel — LEFT of the label per design. */}
+                          {!header.isPlaceholder && header.column.columnDef.meta?.filter && (
+                            <ColumnHeaderFilter filter={header.column.columnDef.meta.filter} state={state} />
                           )}
                           {header.isPlaceholder ? null : canSort ? (
                             <button
