@@ -239,15 +239,20 @@ export function CommandDock({ now, className }: CommandDockProps) {
         }}
       >
         {/* ── Stage 1/2: the pill row. Stays put when the panel opens. ── */}
-        {/* The whole pill surface toggles the panel, like the source component's
-            full-bleed trigger — clicking the gap between the launcher and the
-            controls should not feel dead. Only clicks that land on the row itself
-            count (never on a child control), and the keyboard path stays the real
-            button below, so this adds no second tab stop. */}
+        {/* The ENTIRE pill surface is one open/close toggle — click anywhere on the
+            chrome (logo, brand, status, clock, gaps, dividers, nav strip) to open,
+            click again to close. The two EXCEPTIONS own their own clicks and never
+            toggle the panel: the notification bell and the profile menu (their
+            wrapper carries `data-dock-exclude`). Child controls that already
+            toggle/open on their own (the brand button, the nav dots) are left to
+            their handler so this never double-fires. The keyboard path stays the
+            real brand button below, so this adds no second tab stop. */}
         <div
           className="flex items-center gap-2 px-2 py-1.5"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setOpen(!open);
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-dock-exclude]') || target.closest('button')) return;
+            setOpen(!open);
           }}
         >
           <div className="flex min-w-0 flex-1 items-center">
@@ -255,8 +260,8 @@ export function CommandDock({ now, className }: CommandDockProps) {
               ref={pillRef}
               type="button"
               onClick={() => setOpen(!open)}
-              className="hover:bg-glass-foreground/10 focus-visible:ring-ring inline-flex min-h-11 min-w-0 max-w-[28rem] items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] focus-visible:ring-2 motion-reduce:active:scale-100"
-              aria-label={`Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
+              className="hover:bg-glass-foreground/10 focus-visible:ring-ring inline-flex min-h-11 min-w-0 max-w-[36rem] items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] focus-visible:ring-2 motion-reduce:active:scale-100"
+              aria-label={`arsam.net · Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
               aria-keyshortcuts="Meta+K Control+K"
               aria-haspopup="dialog"
               aria-expanded={panelOpen}
@@ -264,28 +269,37 @@ export function CommandDock({ now, className }: CommandDockProps) {
               data-entity="command"
             >
               <DockLogo className="size-7 shrink-0" />
-              {/* Where you are, stated plainly. A steady green dot marks it as live —
-                  no pulse: a loop that never resolves keeps asking for attention it
-                  does not need. */}
-              <span className="bg-success size-1.5 shrink-0 rounded-full" aria-hidden />
-              <span className="text-muted-foreground shrink-0">Şu an:</span>
-              <span className="flex min-w-0 items-center gap-1">
-                {statusTrail.map((step, index) => (
-                  <span key={step.key} className="flex min-w-0 items-center gap-1">
-                    {index > 0 && <span className="text-muted-foreground shrink-0">›</span>}
-                    <span className={cn('truncate', step.muted ? 'text-muted-foreground' : 'font-semibold')}>
-                      {step.label}
-                    </span>
+              {/* Brand-led resting pill. The verbose status (where you are, the
+                  clock, ⌘K) is decluttered out of the collapsed state and springs
+                  back on hover or keyboard focus-within — the same reveal mechanism
+                  the nav strip uses. The button's accessible NAME (below) still
+                  carries the full "Şu an: … saat …" reading, so assistive tech and
+                  the status contract are unaffected by the visual gating. */}
+              <span className="shrink-0 font-semibold tracking-tight">arsam.net</span>
+              <span className="dock-reveal">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  {/* A steady green dot marks it live — no pulse. */}
+                  <span className="bg-success size-1.5 shrink-0 rounded-full" aria-hidden />
+                  <span className="text-muted-foreground shrink-0">Şu an:</span>
+                  <span className="flex min-w-0 items-center gap-1">
+                    {statusTrail.map((step, index) => (
+                      <span key={step.key} className="flex min-w-0 items-center gap-1">
+                        {index > 0 && <span className="text-muted-foreground shrink-0">›</span>}
+                        <span className={cn('truncate', step.muted ? 'text-muted-foreground' : 'font-semibold')}>
+                          {step.label}
+                        </span>
+                      </span>
+                    ))}
                   </span>
-                ))}
+                  <span className="bg-glass-border/70 h-3.5 w-px shrink-0" aria-hidden />
+                  <span className="text-muted-foreground shrink-0 font-mono text-[0.6875rem] tabular-nums tracking-wide">
+                    {time}
+                  </span>
+                  <kbd className="bg-background/40 text-muted-foreground border-glass-border pointer-events-none ml-0.5 shrink-0 select-none rounded border px-1.5 font-mono text-[0.625rem]">
+                    ⌘K
+                  </kbd>
+                </span>
               </span>
-              <span className="bg-glass-border/70 h-3.5 w-px shrink-0" aria-hidden />
-              <span className="text-muted-foreground shrink-0 font-mono text-[0.6875rem] tabular-nums tracking-wide">
-                {time}
-              </span>
-              <kbd className="bg-background/40 text-muted-foreground border-glass-border pointer-events-none ml-0.5 shrink-0 select-none rounded border px-1.5 font-mono text-[0.625rem]">
-                ⌘K
-              </kbd>
             </button>
 
             {/* Inline module dots — the track collapses to 0fr and springs back to
@@ -355,11 +369,21 @@ export function CommandDock({ now, className }: CommandDockProps) {
             </nav>
           </div>
 
-          {/* Thin divider, then the always-visible controls (notifications + user). */}
+          {/* Thin divider, then the controls. Notifications stay in the resting
+              pill; the user menu joins the hover/focus reveal so the collapsed
+              state is brand + bell only. On coarse pointers the pill starts
+              engaged (theme.css), so the menu is never hover-trapped on touch. */}
           <Separator orientation="vertical" className="bg-glass-border/60 h-6" />
-          <div className="flex shrink-0 items-center gap-1">
+          {/* Bell + profile are the two exceptions to the click-anywhere toggle:
+              they own their clicks (notifications popover / user menu) and must not
+              open or close the command panel. */}
+          <div className="flex shrink-0 items-center gap-1" data-dock-exclude>
             {notificationsEnabled && <NotificationBell />}
-            <UserMenu />
+            <span className="dock-reveal">
+              <span>
+                <UserMenu />
+              </span>
+            </span>
           </div>
         </div>
 

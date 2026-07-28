@@ -46,16 +46,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Desktop (xl+) — the decluttered pill leads with the active page, controls on the right. */
+/**
+ * Desktop (xl+) — the resting pill is brand-led (`arsam.net`) with the notification
+ * bell. The status line and the user menu are decluttered into the hover/focus
+ * reveal, but stay in the DOM (and keyboard-reachable), so they resolve here.
+ */
 export const Default: Story = {
   parameters: { viewport: { defaultViewport: 'bpXl' } },
   play: async () => {
     const body = within(document.body);
     // Launcher's accessible name carries the active page (route `/` → Genel Bakış).
-    await expect(body.getByRole('button', { name: /Genel Bakış.*menü ve komut/i })).toBeInTheDocument();
+    const pill = body.getByRole('button', { name: /Genel Bakış.*menü ve komut/i });
+    await expect(pill).toBeInTheDocument();
+    // The resting pill leads with the brand wordmark.
+    await expect(pill).toHaveTextContent('arsam.net');
     // Notification bell present with the default flag on.
     await expect(body.getByRole('button', { name: /Bildirimler/ })).toBeInTheDocument();
-    // User menu present on the right.
+    // User menu present (in the reveal, still in the DOM).
     await expect(body.getByRole('button', { name: 'Kullanıcı menüsü' })).toBeInTheDocument();
   },
 };
@@ -125,9 +132,33 @@ export const PanelOpen: Story = {
 };
 
 /**
- * The launcher states where you are in words — "Şu an: <yol> · <saat>" — with a
- * steady green dot marking it live. No pulse: a loop that never resolves keeps
- * asking for attention the reading does not need. `now` freezes the clock.
+ * The ENTIRE pill surface is one open/close toggle: a click opens the panel and a
+ * click again closes it. The two exceptions own their own clicks and never toggle
+ * the panel — the notification bell (opens notifications) and the profile menu.
+ */
+export const ClickToggle: Story = {
+  parameters: { viewport: { defaultViewport: 'bpXl' } },
+  play: async () => {
+    const body = within(document.body);
+    const pill = body.getByRole('button', { name: LAUNCHER });
+    // Click opens…
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute('aria-expanded', 'true'));
+    // …and clicking again closes (toggle).
+    await userEvent.click(pill);
+    await waitFor(() => expect(pill).toHaveAttribute('aria-expanded', 'false'));
+    // The bell is excluded — clicking it opens notifications, never the panel.
+    await userEvent.click(body.getByRole('button', { name: /Bildirimler/ }));
+    await expect(pill).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
+/**
+ * The launcher's ACCESSIBLE NAME always states where you are in words — "Şu an:
+ * <yol>, saat <saat>" — so assistive tech gets the full reading at rest, even
+ * though the status trail + clock are visually decluttered out of the collapsed
+ * (brand-led) pill and spring back on hover or keyboard focus-within. A steady
+ * green dot marks it live — no pulse. `now` freezes the clock.
  */
 export const StatusLine: Story = {
   args: { now: new Date('2026-07-24T13:24:00') },
@@ -135,12 +166,13 @@ export const StatusLine: Story = {
   play: async () => {
     const body = within(document.body);
     const pill = body.getByRole('button', { name: LAUNCHER });
-    // Visible: the trail and the clock, both readable without hovering anything.
+    // At rest the accessible name carries the full reading as one sentence.
+    await expect(pill).toHaveAccessibleName(/Şu an: Genel Bakış, saat 13:24/);
+    // Hover reveals the visible status trail + clock.
+    await userEvent.hover(pill);
     await expect(pill).toHaveTextContent('Şu an:');
     await expect(pill).toHaveTextContent('Genel Bakış');
     await expect(pill).toHaveTextContent('13:24');
-    // The accessible name carries the same reading as one sentence.
-    await expect(pill).toHaveAccessibleName(/Şu an: Genel Bakış, saat 13:24/);
   },
 };
 
