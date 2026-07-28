@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, within } from 'storybook/test';
 
 import { CommandCardLauncher } from './CommandCardLauncher';
 import { CommandPaletteProvider } from './command-palette-context';
@@ -22,60 +22,34 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Identity header + navigation icon-tiles + a natural-language box. */
+/**
+ * Below xl this is the command center's host: a dialog anchored under the mobile
+ * command bar, carrying the same `CommandCenter` body the dock pill unfolds.
+ */
 export const Default: Story = {
+  parameters: { viewport: { defaultViewport: 'bpSm' } },
   play: async () => {
-    const dialog = await within(document.body).findByRole('dialog');
-    // Identity header: default user name + role badge (ref #47 chrome).
+    const dialog = await within(document.body).findByRole('dialog', {
+      name: 'Nereye gitmek istersin?',
+    });
+    // The shared body is present: identity strip + module cards + NL box.
     await expect(within(dialog).getByText('Ahmet Yönetici')).toBeInTheDocument();
-    await expect(within(dialog).getByText('Süper Admin')).toBeInTheDocument();
-
-    // Modules render as navigable icon-tiles; the active module (route `/`) is marked.
-    const overview = within(dialog).getByRole('button', { name: /Genel Bakış/ });
-    await expect(overview).toHaveAttribute('aria-current', 'page');
-    const listings = within(dialog).getByRole('button', { name: /İlanlar/ });
-    await expect(listings).toBeInTheDocument();
-    await expect(listings).not.toHaveAttribute('aria-current');
-
-    // Footer status is present.
-    await expect(within(dialog).getByText('AI hazır')).toBeInTheDocument();
+    await expect(within(dialog).getByRole('link', { name: /Genel Bakış/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(within(dialog).getByLabelText('Doğal dil komutu')).toBeInTheDocument();
   },
 };
 
-/** The NL box PROPOSES an action; nothing applies until the user confirms. */
-export const NaturalLanguage: Story = {
+/**
+ * From xl up the launcher renders NOTHING — the dock pill hosts the command
+ * center inside itself, and two surfaces on one open state would fight over
+ * focus, scroll lock and Escape.
+ */
+export const DesktopStandsDown: Story = {
+  parameters: { viewport: { defaultViewport: 'bpXl' } },
   play: async () => {
-    const dialog = await within(document.body).findByRole('dialog');
-    const input = within(dialog).getByLabelText('Doğal dil komutu');
-    await userEvent.type(input, 'ilanlara git');
-    await userEvent.click(within(dialog).getByRole('button', { name: /Yorumla/ }));
-    // Proposed navigate intent with a confirm button (guardrail: confirm-before-apply).
-    await expect(within(dialog).getByText('Sayfaya git')).toBeInTheDocument();
-    await expect(within(dialog).getByRole('button', { name: /Git/ })).toBeInTheDocument();
+    await expect(within(document.body).queryByRole('dialog')).toBeNull();
   },
-};
-
-/** Module search filters the card grid. */
-export const Search: Story = {
-  play: async () => {
-    const dialog = await within(document.body).findByRole('dialog');
-    const search = within(dialog).getByLabelText('Modül ara');
-    await userEvent.type(search, 'ilan');
-    await expect(within(dialog).getByText('İlanlar')).toBeInTheDocument();
-    // Dashboard ("Genel Bakış") is filtered out by the query.
-    await expect(within(dialog).queryByText('Genel Bakış')).toBeNull();
-  },
-};
-
-/** No module matches the search query. */
-export const EmptySearch: Story = {
-  play: async () => {
-    const dialog = await within(document.body).findByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Modül ara'), 'zzzznope');
-    await expect(within(dialog).getByText('Sonuç bulunamadı.')).toBeInTheDocument();
-  },
-};
-
-export const Mobile: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
