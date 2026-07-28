@@ -33,5 +33,7 @@ jobs:
         run: npm run test -- --run
       - name: Build
         run: npm run build
+      - name: Bundle-size budget
+        run: node scripts/check-bundle-size.mjs
       - name: Build Storybook
         run: npm run build-storybook
