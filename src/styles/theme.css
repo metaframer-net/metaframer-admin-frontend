@@ -66,6 +66,12 @@
   /* Darker/denser than the plain border so the glass edge clears WCAG 1.4.11
      (3:1) against the near-white app background; shadow-lg is the primary cue. */
   --glass-border: oklch(0.82 0.01 250 / 0.9);
+  /* Scrim — the dimming veil under a floating modal surface. It DARKENS in both
+     themes on purpose: a `--foreground`-tinted veil would lighten the page in
+     dark mode, and bright page content (glows, imagery) would then bleed through
+     the glass chrome above it. Same value in both themes; the surfaces on top
+     supply the contrast. */
+  --scrim: oklch(0.16 0.012 265 / 0.55);
   --radius: 0.625rem;
 }
 
@@ -115,6 +121,20 @@
   --glass-border: oklch(0.42 0.02 265 / 0.85);
 }
 
+/* Reduced transparency — a system-level request, not a preference we can ignore.
+   Solidifying the glass token is enough: every surface that consumes it follows,
+   and the backdrop blur behind an opaque layer costs nothing visually. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: oklch(0.994 0.002 250);
+    --scrim: oklch(0.16 0.012 265 / 0.75);
+  }
+
+  .dark {
+    --glass: oklch(0.245 0.017 265);
+  }
+}
+
 /* ===========================================================================
    @theme inline — expose semantic tokens as Tailwind utilities.
    =========================================================================== */
@@ -162,12 +182,18 @@
   --color-glass: var(--glass);
   --color-glass-foreground: var(--glass-foreground);
   --color-glass-border: var(--glass-border);
+  --color-scrim: var(--scrim);
 
   /* Radii — derived from --radius per DESIGN_SYSTEM.md */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  /* 28px — the dock's one and only radius. At pill height the browser clips it to
+     a capsule; with the panel open it reads as a corner. Because the value never
+     changes, closing the panel leaves no shape change for the eye to catch. */
+  --radius-3xl: calc(var(--radius) + 18px);
 
   /* Breakpoints — 8-token named scale (Aşama 6, task 019).
      NOTE: adding --breakpoint-* to @theme REPLACES Tailwind's default scale
@@ -239,6 +265,12 @@
      protected (base layer collapses it to a single ~0ms cycle ending at scale(1), plus
      an explicit motion-reduce:animate-none on the element). */
   --animate-pulse-soft: pulse-soft 1.8s var(--ease-in-out) infinite;
+
+  /* Live indicator halo — a dot expands and fades to mark "this reading is live"
+     (the dock status chip's clock). Decorative: the element carrying it is
+     `aria-hidden` and adds `motion-reduce:animate-none` on top of the base-layer
+     collapse. */
+  --animate-live-ping: live-ping 1.6s var(--ease-standard) infinite;
 }
 
 @keyframes accordion-down {
@@ -313,6 +345,14 @@
     transform: scale(1.04);
   }
 }
+/* Live halo — the ring grows past the core and fades out, then rests. */
+@keyframes live-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
 
 /* Interactive card hover-lift — token-driven, applied ONLY by `Card interactive`.
    Hover lifts + deepens the shadow; the transition uses our motion tokens. Under
@@ -363,6 +403,191 @@
   }
   .stagger-children > *:nth-child(n + 8) {
     animation-delay: calc(var(--stagger-step) * 7);
+  }
+
+  /* ── Command dock — three-stage pill (dock mode) ───────────────────────────
+     Stage 1 collapsed → stage 2 engaged (hover OR keyboard focus-within: the
+     nav strip and the status chip spring out) → stage 3 open (the command center
+     unfolds INSIDE the same surface; see CommandDock).
+
+     The stage widths are explicit so `width` can actually be interpolated — an
+     `auto`-sized pill would jump between stages. Each reveal then animates its
+     own `0fr → 1fr` grid track, so a panel grows from its natural content width
+     without measuring it in JS, and both reveals share one engaged state, so
+     hovering or tabbing into either keeps the pill open. Reduced motion is
+     handled by the base layer (durations → ~0). */
+  .dock-pill {
+    /* Engaged and open are the SAME width: the pill grows once and stays. If open
+       were narrower, clicking while hovered would widen then shrink mid-unfold —
+       the surface would read as fighting itself. */
+    --dock-w-closed: min(92vw, 32rem);
+    --dock-w-engaged: min(94vw, 54rem);
+    --dock-w-open: min(94vw, 54rem);
+    width: var(--dock-w-closed);
+    border-radius: var(--radius-3xl);
+    /* Exit is quicker than entry: opening is a reveal the eye follows, closing is
+       an answer already given. Radius is deliberately absent from this list — a
+       surface that visibly re-rounds on the way out is exactly what a dismissal
+       should not draw attention to. */
+    transition: width var(--duration-base) var(--ease-emphasized);
+  }
+
+  /* Hover is gated to pointers that can actually hover — a tap must not latch the
+     engaged stage on. Keyboard focus is not gated: it works on every device. */
+  @media (hover: hover) and (pointer: fine) {
+    .dock-pill:hover {
+      width: var(--dock-w-engaged);
+    }
+  }
+
+  .dock-pill:focus-within {
+    width: var(--dock-w-engaged);
+  }
+
+  .dock-pill[data-open='true'],
+  .dock-pill[data-open='true']:hover,
+  .dock-pill[data-open='true']:focus-within {
+    width: var(--dock-w-open);
+    transition-duration: var(--duration-slow);
+  }
+
+  /* The panel's height animates from the pill's edge to the content's own size.
+     `0fr → 1fr` does what `height: 0 → auto` cannot: interpolate. */
+  .dock-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--duration-base) var(--ease-emphasized);
+  }
+
+  .dock-panel > * {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-emphasized);
+  }
+
+  .dock-pill[data-open='true'] .dock-panel {
+    grid-template-rows: 1fr;
+    transition-duration: var(--duration-slow);
+  }
+
+  /* Opening: the surface starts growing, then the contents materialise into it.
+     Closing: the contents leave first, so the fold happens behind nothing and the
+     user registers "it went away" rather than "it changed shape". */
+  .dock-pill[data-open='true'] .dock-panel > * {
+    opacity: 1;
+    transition-duration: var(--duration-base);
+    transition-delay: var(--duration-fast);
+  }
+
+  .dock-reveal {
+    display: grid;
+    /* A flex child by default refuses to shrink below its content; the chip must,
+       so the interactive nav strip keeps its full width when both are open. */
+    min-width: 0;
+    grid-template-columns: 0fr;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      grid-template-columns var(--duration-slow) var(--ease-emphasized),
+      opacity var(--duration-base) var(--ease-emphasized);
+  }
+
+  /* The grid item is the scroll-port the track squeezes; without `min-width: 0`
+     its content would refuse to shrink below its intrinsic size. */
+  .dock-reveal > * {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dock-pill:hover .dock-reveal {
+      grid-template-columns: 1fr;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  .dock-pill:focus-within .dock-reveal {
+    grid-template-columns: 1fr;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Coarse pointers have no hover stage at all, so the pill starts engaged rather
+     than waiting for a hover that can never arrive. */
+  @media (hover: none), (pointer: coarse) {
+    .dock-pill {
+      width: var(--dock-w-engaged);
+    }
+  }
+
+  /* Open, the panel's card grid supersedes the preview strip — keeping both would
+     offer the same modules twice, and focus inside the panel would otherwise hold
+     the strip open through `:focus-within`. */
+  /* The nav strip holds targets, so it keeps its width and the chip elides. */
+  .dock-reveal-nav {
+    flex: none;
+  }
+
+  .dock-pill[data-open='true'] .dock-reveal-nav {
+    grid-template-columns: 0fr;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Keyboard-driven open/close (⌘K, Escape) skips the motion entirely — those are
+     high-frequency actions where animation reads as lag, not craft. Declared last:
+     it has the same specificity as the `[data-open]` rules it must override, so
+     source order is what decides. */
+  .dock-pill[data-instant='true'],
+  .dock-pill[data-instant='true'] .dock-panel,
+  .dock-pill[data-instant='true'] .dock-reveal,
+  .dock-pill[data-instant='true'] .dock-panel > * {
+    transition-duration: 0s;
+  }
+
+  /* The close control turns toward the dismiss gesture as the pointer arrives.
+     Hover-capable pointers only (a tap would land mid-rotation), and dropped
+     entirely under reduced motion — the colour change still carries the
+     affordance. Applies to both hosts of the command center. */
+  .dock-close,
+  .dock-command-center [data-slot='dialog-close'] {
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard),
+      transform var(--duration-base) var(--ease-emphasized);
+  }
+
+  /* Press feedback — the control must be felt answering, not just seen. */
+  .dock-close:active,
+  .dock-command-center [data-slot='dialog-close']:active {
+    transform: scale(0.94);
+    transition-duration: var(--duration-fast);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dock-close:hover:active,
+    .dock-command-center [data-slot='dialog-close']:hover:active {
+      transform: rotate(90deg) scale(0.94);
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dock-close:hover,
+    .dock-command-center [data-slot='dialog-close']:hover {
+      transform: rotate(90deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dock-close:hover,
+    .dock-close:active,
+    .dock-command-center [data-slot='dialog-close']:hover,
+    .dock-command-center [data-slot='dialog-close']:active {
+      transform: none;
+    }
   }
 }
 
