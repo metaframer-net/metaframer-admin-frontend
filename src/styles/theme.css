@@ -182,6 +182,9 @@
   --color-glass: var(--glass);
   --color-glass-foreground: var(--glass-foreground);
   --color-glass-border: var(--glass-border);
+  /* Dock magnify lens fill — a faint raised chip that reads on the glass in both
+     themes (derived from --glass-foreground, so it tracks light/dark). */
+  --color-glass-lens: color-mix(in oklch, var(--glass-foreground) 6%, transparent);
   --color-scrim: var(--scrim);
 
   /* Radii — derived from --radius per DESIGN_SYSTEM.md */
@@ -240,6 +243,13 @@
   --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08), 0 1px 2px oklch(0 0 0 / 0.08);
   --shadow-md: 0 4px 8px oklch(0 0 0 / 0.08);
   --shadow-lg: 0 8px 24px oklch(0 0 0 / 0.12);
+  /* Dock magnify lens — the always-on selection indicator that glides under the
+     hovered/active icon. Four layers (top highlight, bottom lowlight, hairline ring
+     from --glass-foreground so it adapts by theme, soft drop) reinterpret the
+     GlassDock reference's raised-capsule in our tokens. Golden Rule 1/2. */
+  --shadow-lens: inset 0 1px 0 oklch(1 0 0 / 0.5), inset 0 -1px 0 oklch(0 0 0 / 0.06),
+    inset 0 0 0 1px color-mix(in oklch, var(--glass-foreground) 26%, transparent),
+    0 4px 12px -2px oklch(0 0 0 / 0.18);
 
   /* Motion */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
