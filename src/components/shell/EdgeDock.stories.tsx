@@ -110,28 +110,32 @@ export const HoverLens: Story = {
     // Point at the LAST tile (the ⌘K action) — never the resting active one.
     const box = track.getBoundingClientRect();
     const y = box.y + box.height / 2;
-    for (let i = 0; i < 24; i += 1) {
-      track.dispatchEvent(
-        new PointerEvent('pointermove', {
-          pointerType: 'mouse',
-          clientX: box.right - 12,
-          clientY: y,
-          bubbles: true,
-        }),
-      );
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-
-    await expect(lens.style.left).not.toBe(restLeft);
     const tiles = Array.from(track.children).filter((el): el is HTMLElement => el instanceof HTMLDivElement);
     const last = tiles[tiles.length - 1];
     if (!last) throw new Error('no dock tiles');
-    // The lens glides to the pointed-at tile via a per-frame rAF lerp — poll until it has
-    // landed (same left, within a pixel) instead of measuring one un-settled frame, which
-    // leaves a few px of easing left on slower/headless runners.
-    await waitFor(() =>
-      expect(Math.abs(parseFloat(lens.style.left) - parseFloat(last.style.left))).toBeLessThan(1.5),
+
+    // The lens glides to the pointed-at tile via a per-frame rAF lerp, and that loop only
+    // reschedules while it is still moving. Its frame cadence is irregular under headless
+    // CI load, so instead of firing a fixed burst and then hoping it settles within the
+    // poll window, re-dispatch the move on EVERY poll: each one re-arms the rAF loop, so
+    // the lens keeps converging no matter how the runner schedules frames. Deterministic.
+    await waitFor(
+      () => {
+        track.dispatchEvent(
+          new PointerEvent('pointermove', {
+            pointerType: 'mouse',
+            clientX: box.right - 12,
+            clientY: y,
+            bubbles: true,
+          }),
+        );
+        // Landed on the pointed-at tile (same left, within a pixel).
+        expect(Math.abs(parseFloat(lens.style.left) - parseFloat(last.style.left))).toBeLessThan(1.5);
+      },
+      { timeout: 5000 },
     );
+    // …and it genuinely left its resting position (it started on the active tile).
+    expect(lens.style.left).not.toBe(restLeft);
   },
 };
 
