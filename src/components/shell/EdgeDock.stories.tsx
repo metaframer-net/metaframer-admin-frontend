@@ -75,7 +75,9 @@ export const Keyboard: Story = {
   play: async () => {
     const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
     hint.focus();
-    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    // focus() → onFocus → setOpen(true); poll until React flushes the state to the DOM
+    // (asserting once races the state update on slower/headless runners).
+    await waitFor(() => expect(hint).toHaveAttribute('aria-expanded', 'true'));
 
     // Move focus off the hint into the first nav tile — the label follows it.
     await userEvent.tab();
@@ -124,8 +126,12 @@ export const HoverLens: Story = {
     const tiles = Array.from(track.children).filter((el): el is HTMLElement => el instanceof HTMLDivElement);
     const last = tiles[tiles.length - 1];
     if (!last) throw new Error('no dock tiles');
-    // The lens has landed on the pointed-at tile (same left, within a pixel).
-    await expect(Math.abs(parseFloat(lens.style.left) - parseFloat(last.style.left))).toBeLessThan(1.5);
+    // The lens glides to the pointed-at tile via a per-frame rAF lerp — poll until it has
+    // landed (same left, within a pixel) instead of measuring one un-settled frame, which
+    // leaves a few px of easing left on slower/headless runners.
+    await waitFor(() =>
+      expect(Math.abs(parseFloat(lens.style.left) - parseFloat(last.style.left))).toBeLessThan(1.5),
+    );
   },
 };
 
