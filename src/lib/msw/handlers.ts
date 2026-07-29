@@ -14,6 +14,7 @@ import { reportsHandlers as analyticsHandlers } from '@/features/reports/api/han
 import { auditHandlers } from '@/features/audit/api/handlers';
 import { rbacHandlers } from '@/features/rbac/api/handlers';
 import { settingsHandlers } from '@/features/settings/api/handlers';
+import { authHandlers } from '@/features/auth/api/handlers';
 
 /**
  * Demo endpoint proving the resource contract:
@@ -52,6 +53,8 @@ export const demoHandlers = [
 /** Aggregated handler registry. Features register here as they land. */
 export const handlers = [
   ...demoHandlers,
+  // Exact `/auth/*` routes (login/me/logout); no param-route prefix collision.
+  ...authHandlers,
   ...listingsHandlers,
   ...usersHandlers,
   ...categoriesHandlers,

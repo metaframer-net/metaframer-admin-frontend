@@ -2,6 +2,12 @@ import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 
 import { AppShell } from '@/components/shell/AppShell';
+import { AuthGate } from '@/features/auth/components/AuthGate';
+import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { TwoFactorPage } from '@/features/auth/pages/TwoFactorPage';
+import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
+import { AcceptInvitePage } from '@/features/auth/pages/AcceptInvitePage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import type { RouteHandle } from './route-meta';
 
@@ -39,6 +45,10 @@ const ReportsPage = named(() => import('@/features/reports'), 'ReportsPage');
 const AuditListPage = named(() => import('@/features/audit'), 'AuditListPage');
 const RbacPage = named(() => import('@/features/rbac'), 'RbacPage');
 const SettingsPage = named(() => import('@/features/settings'), 'SettingsPage');
+const AccountSecurityPage = named(
+  () => import('@/features/auth/pages/AccountSecurityPage'),
+  'AccountSecurityPage',
+);
 
 const meta = (routeMeta: RouteHandle['routeMeta']): RouteHandle => ({ routeMeta });
 
@@ -53,9 +63,42 @@ const meta = (routeMeta: RouteHandle['routeMeta']): RouteHandle => ({ routeMeta 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 export const router = createBrowserRouter([
+  // Public — outside AppShell and the auth gate (login is imported eagerly so
+  // there is no code-split Suspense flash on the unauthenticated entry point).
+  {
+    path: '/login',
+    Component: LoginPage,
+    handle: meta({ title: 'Giriş yap', aiEntity: 'auth' }),
+  },
+  {
+    path: '/login/2fa',
+    Component: TwoFactorPage,
+    handle: meta({ title: 'İki adımlı doğrulama', aiEntity: 'auth' }),
+  },
+  {
+    path: '/forgot-password',
+    Component: ForgotPasswordPage,
+    handle: meta({ title: 'Şifremi unuttum', aiEntity: 'auth' }),
+  },
+  {
+    path: '/reset-password',
+    Component: ResetPasswordPage,
+    handle: meta({ title: 'Şifre sıfırla', aiEntity: 'auth' }),
+  },
+  {
+    path: '/accept-invite',
+    Component: AcceptInvitePage,
+    handle: meta({ title: 'Daveti tamamla', aiEntity: 'auth' }),
+  },
+  // Protected — the whole app tree behind the AuthGate (authentication), which
+  // runs BEFORE AppShell's RouteGuard (authorization/RBAC).
   {
     path: '/',
-    Component: AppShell,
+    element: (
+      <AuthGate>
+        <AppShell />
+      </AuthGate>
+    ),
     children: [
       { index: true, Component: DashboardPage, handle: meta({ title: 'Genel Bakış', aiEntity: 'dashboard' }) },
       {
@@ -171,6 +214,13 @@ export const router = createBrowserRouter([
         path: 'settings',
         Component: SettingsPage,
         handle: meta({ title: 'Ayarlar', permission: 'settings.manage', aiEntity: 'settings' }),
+      },
+      {
+        // Personal account security — every authenticated admin manages their own
+        // (no RBAC permission gate).
+        path: 'account/security',
+        Component: AccountSecurityPage,
+        handle: meta({ title: 'Hesap ve güvenlik', aiEntity: 'account' }),
       },
       { path: '*', Component: () => <PlaceholderPage title="Sayfa bulunamadı" description="Aradığınız sayfa mevcut değil." /> },
     ],
