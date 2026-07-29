@@ -4,6 +4,7 @@ import { Outlet } from 'react-router-dom';
 import { useLayout } from '@/lib/layout/layout-context';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
 import { AssistantDock } from '@/components/ai';
+import { SessionGuard } from '@/features/auth/components/SessionGuard';
 import { PageSkeleton } from '@/app/pages/PageSkeleton';
 import { CommandPaletteProvider } from './command-palette-context';
 import { CommandLauncher } from './CommandLauncher';
@@ -55,6 +56,7 @@ export function AppShell({ children }: AppShellProps) {
         {effectiveMode !== 'dock' && <MobileBottomNav />}
         <CommandLauncher variant={effectiveMode === 'dock' ? 'cards' : 'list'} />
         <AssistantDock />
+        <SessionGuard />
       </div>
     </CommandPaletteProvider>
   );
