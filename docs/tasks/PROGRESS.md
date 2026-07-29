@@ -1469,3 +1469,115 @@ count varies run-to-run; all touched files pass in isolation). Pre-existing unre
 `CommandLauncher > Cards` (stems from uncommitted working-tree dock edits, not this arc).
 
 Awaiting the user's manual commits (phase-by-phase; see final report).
+
+## Auth arc (032 → 034) — MARATHON
+Goal: real (MSW-simulated) authentication feeding the existing RBAC. Internal admin panel → no self-signup.
+Login design = variant A ("centered minimal card"), chosen by the user from `docs/mockups/auth-login-variants.html`.
+
+- **032 — Auth Core.** DONE.
+  - Built: `lib/api/auth-token.ts` (bearer token store, localStorage + in-memory fallback, `UNAUTHORIZED_EVENT`);
+    `lib/api/client.ts` (injects `Authorization: Bearer`; emits unauthorized on a tokened 401);
+    `lib/auth/auth-context.tsx` (`AuthProvider`/`useAuth`/`useAuthOptional`, `SessionUser`, boot via `GET /auth/me`,
+    401-event listener; `initialState` escape hatch for stories/tests); `features/auth/` (schemas, seed admins [one
+    per role, shared demo password `arsam1234` — MOCK plaintext], MSW `login`/`me`/`logout` + audit + `resetAuthDb`,
+    `useLogin`/`useLogout`, presentational `LoginForm` [RHF+Zod, FieldHelp, password reveal, remember], `AuthGate`
+    [boot spinner / redirect-to-login with `?returnTo` / children], `LoginPage` [variant A]).
+  - Wired: `permission-context` now derives the RBAC user from `AuthProvider` (removed hardcoded `DEFAULT_USER` as the
+    source; kept as an isolated-render fallback) — `useSession`/`Can`/`RouteGuard`/nav/command surfaces UNCHANGED;
+    `providers.tsx` adds `AuthProvider` (with `initialAuth` for stories/tests); `router.tsx` adds public `/login`
+    OUTSIDE AppShell and wraps the protected tree in `<AuthGate>` (auth precedes RBAC `RouteGuard`); `UserMenu` wires
+    the (previously dead) "Çıkış yap" to `useLogout`, shows email, and gates the role-preview switcher to DEV only;
+    auth handlers registered in `lib/msw/handlers.ts`.
+  - Decisions/assumptions:
+    - AuthProvider owns state only (renders above the router); redirects are declarative via `AuthGate` off `status`,
+      so an expired-session 401 (→ `UNAUTHORIZED_EVENT` → `clearSession`) auto-bounces to `/login`. No imperative nav
+      from the provider (avoids a router↔context cycle).
+    - `useSession` contract kept non-null so all existing consumers/stories/tests work untouched; `AuthGate` guarantees
+      the only real consumers (protected tree) mount only when authenticated.
+    - Token store needs an in-memory fallback: this machine's jsdom exposes a partial `localStorage` (missing
+      `removeItem`); real browsers use `localStorage`.
+    - `LoginForm` is presentational (`onSubmit`/`pending`/`errorMessage`) so Storybook can exercise validation/toggle/
+      submit with NO network (Storybook has no MSW); the full login↔me↔logout↔audit flow is covered by Node-MSW unit
+      tests + the `AuthProvider` boot test.
+    - `requires2fa` is declared in the login response schema as a phase-033 extension point but never set in 032.
+  - Verification: `typecheck` clean · `lint` 0 errors (19 warnings, all pre-existing patterns: `form.watch`
+    incompatible-library + context-file react-refresh) · full `npm run test` **1025/1025 green** (169 unit + 856
+    storybook) · `npm run build` OK · `npm run build-storybook` OK.
+  - Suggested commit message:
+    `feat(auth): add authentication core — login (variant A), MSW backend, AuthGate + session/RBAC bridge`
+
+- **033 — Recovery, invite & 2FA.** DONE.
+  - Pages (all public, variant-A via shared `AuthShell`): `/forgot-password` (neutral "sent" confirmation, no account
+    enumeration; demo surfaces the reset link inline since no real email), `/reset-password?token=` (SetPasswordForm +
+    strength meter; handles missing/invalid/expired token + success), `/accept-invite?token=` (validates invite →
+    shows invitee → set first password → auto sign-in), `/login/2fa` (TOTP step reached only from LoginPage via nav
+    state; direct visit bounces to /login).
+  - Components: shared `AuthShell` + `BrandMark` (extracted so login/recovery/invite/2fa are visually identical);
+    presentational `SetPasswordForm` (password+confirm, reveal, `scorePassword` strength meter), `TwoFactorForm`,
+    `ForgotPasswordForm`.
+  - MSW (extends `features/auth/api/handlers.ts`): login now branches — 2FA accounts get `{ requires2fa, challengeToken }`
+    (no session) → `/auth/2fa/verify` mints the session; `+ /auth/forgot-password`, `/auth/reset-password` (password
+    override store, so the new password actually works and the old fails), `GET /auth/invite`, `/auth/accept-invite`
+    (creates a runtime admin, single-use token). New audit actions: `2fa_required/2fa_failed/reset_requested/
+    password_reset/invite_accepted`. `resetAuthDb` resets all new state.
+  - Hooks: `useLogin` is now a pure mutation (LoginPage branches on `requires2fa`); `+ useVerify2fa`, `useForgotPassword`,
+    `useResetPassword`, `useInvite` (query), `useAcceptInvite`. `authErrorMessage` takes an optional fallback.
+  - Seed: super-admin is 2FA-enabled (so the step is reachable); `DEMO_TOTP_CODE = '123456'`; one pending invite
+    (`invite-demo`). Router: 4 new public routes added outside AppShell.
+  - Decisions/assumptions:
+    - `LoginResponse` widened (all fields optional) to carry both the completed-signin and 2FA-challenge shapes; caller
+      branches on `requires2fa`. The 032 `requires2fa` reservation is now implemented.
+    - Challenge token is carried to `/login/2fa` via router navigation state (no global store); direct visits redirect.
+    - `super-admin` login now returns a 2FA challenge (not a token) — the 032 unit/boot tests were updated to use
+      `moderator` for the direct-login path; a dedicated 2FA test covers super-admin.
+    - No real TOTP/email/crypto — mock verifier accepts a single demo code; reset/invite links are surfaced in-UI
+      instead of emailed. Swap-ready for FastAPI.
+  - Verification: `typecheck` clean · `lint` 0 errors (21 warnings, same pre-existing patterns) · full `npm run test`
+    **1066/1066 green** · `npm run build` OK · `npm run build-storybook` OK.
+  - Suggested commit message:
+    `feat(auth): add password recovery, admin invite acceptance, and 2FA step (MSW-simulated)`
+
+- **034 — Account security & session hardening.** DONE.
+  - Page: `/account/security` (protected, inside AppShell, no RBAC gate — every admin manages their own). Four cards:
+    change password (`ChangePasswordForm`), 2FA manage (status + enable dialog with secret/QR-ish + code, disable via
+    ConfirmDialog), active sessions (current + seeded other devices; revoke one / "diğer oturumları kapat"), and recent
+    security activity (reuses `AuditTimeline` over the current user's `auth.*` events). Reached from a new UserMenu item.
+  - Session hardening: `useIdleTimer` + presentational `SessionTimeoutModal` (non-dismissible re-auth) wired by
+    `SessionGuard` (mounted in AppShell → active only while signed in; 15-min default idle → password re-auth or logout).
+    Token refresh: `AuthProvider.refreshSession` + rotate-on-tab-focus; `POST /auth/refresh` rotates the mock token.
+  - MSW (extends handlers): `GET /auth/security`, `POST /auth/change-password` (verifies current), `GET /auth/2fa/setup`,
+    `POST /auth/2fa/enable` (code-gated) / `disable` (runtime `twoFactorOverrides` → also flips whether login demands
+    2FA), `DELETE /auth/sessions/:id`, `POST /auth/sessions/revoke-others`, `POST /auth/refresh`, `POST /auth/reauth`.
+    New audit actions: `password_changed/2fa_enabled/2fa_disabled/session_revoked/sessions_revoked_others`. `resetAuthDb`
+    resets the new state; other-device sessions are lazily seeded per user.
+  - Hooks: `useSecurity`, `useChangePassword`, `use2faSetup`, `useEnable2fa`, `useDisable2fa`, `useRevokeSession`,
+    `useRevokeOtherSessions`, `useReauth` (+ `securityKeys`).
+  - Decisions/assumptions:
+    - Account-security page is personal (no `permission` on the route); all authenticated roles reach it.
+    - Sessions are mock: one real "current" (from the token) + two seeded fake devices with human-readable `lastActive`
+      labels (no real timestamps/geo). Revoking removes them from the per-user list.
+    - Idle default 15 min (prop-overridable); the timer never fires in tests (no activity + fake timers unit-tested).
+    - Token rotates on tab focus; a failed refresh just surfaces as the next-request 401 → existing UNAUTHORIZED path.
+    - `use-idle-timer` writes its callback ref inside an effect (React Compiler forbids ref writes during render).
+  - Verification: `typecheck` clean · `lint` 0 errors (21 warnings, same pre-existing patterns) · full `npm run test`
+    **1093/1093 green** · `npm run build` OK · `npm run build-storybook` OK.
+  - Suggested commit message:
+    `feat(auth): add account security page (password/2FA/sessions) + idle re-auth lock & token refresh`
+
+## Auth arc COMPLETE (032 → 034)
+Full authentication layer feeding the existing RBAC, entirely MSW-simulated and swap-ready for FastAPI. Login (variant
+A) · session boot/persist · AuthGate · logout · 401 handling · password recovery · admin invite · 2FA · account security
+· active sessions · idle lock · token refresh · auth audit. Final full run: **1093/1093 tests green**, typecheck/lint/
+build/build-storybook all green. Awaiting the user's phase-by-phase manual commits (see final report).
+
+### Auth arc — live smoke + reload-persistence fix
+- Real-app smoke (headless Chromium/Playwright over `vite preview`, MSW-in-prod): 6/6 flows green — deep-link
+  `/listings` while signed out → `/login?returnTo`; invalid creds → error; valid (moderator) → into app; **reload →
+  session persists**; super-admin → `/login/2fa`; code `123456` → into app. Only console noise is the deliberate 401
+  from the invalid-credentials step.
+- Fix surfaced by the smoke: the mock session map is per-page-load, so a persisted token was unknown after reload →
+  bounced to /login. `userIdForToken` now falls back to parsing the id out of the opaque `mock-<userId>-<seq>` token
+  (self-contained, like a real JWT would be), so seed-admin sessions survive reloads; logout/refresh still invalidate
+  via a `revokedTokens` set (invalidation tests stay green).
+- Live browser smoke via the chrome-devtools MCP was unavailable (Google Chrome not installed in this environment);
+  Playwright/Chromium (already used by the Storybook test project) was used instead.

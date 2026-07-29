@@ -1,5 +1,43 @@
 # Current Task
--> (none) — **Enterprise İlanlar arc COMPLETE** (Tasks 028 → 031 all done, ADR 0007).
+-> (none) — **Auth arc COMPLETE** (Tasks 032 → 034 all done). Marathon; kullanıcının faz-faz commit'ini bekliyor.
+
+Teslim edilen (hepsi MSW-simüle, FastAPI'ye tak-çalıştır): Login (Variant A) · oturum boot/kalıcılık (`GET /auth/me`) ·
+`AuthGate` (RBAC guard'dan önce) · çıkış · `client.ts` Bearer + merkezî 401 · şifre kurtarma (forgot/reset) · admin
+daveti · 2FA (TOTP adımı) · hesap güvenliği (`/account/security`: şifre/2FA/oturumlar) · idle-lock re-auth · token
+yenileme · auth denetim kaydı. Login tasarımı `docs/mockups/auth-login-variants.html`'den Variant A seçildi.
+Doğrulama: typecheck/lint(0 hata)/build/build-storybook yeşil; **`npm run test` 1093/1093 yeşil**.
+Görev dosyaları: `032-auth-core.md` (+ 033/034 PROGRESS.md'de özetli). Detay checkpoint'ler: `docs/tasks/PROGRESS.md`.
+
+Mode: TASK. Sıradaki: kullanıcının faz-faz manuel commit'leri (mesajlar final raporda) → yeni hedef gelene kadar backlog boş.
+
+---
+
+## Archived: Auth arc başlangıcı (artık tamamlandı)
+-> **032 — Auth Core** (`docs/tasks/032-auth-core.md`). Auth arc (032 → 034) başlıyor.
+
+## Auth arc — neden ve ne
+Proje bugün eksiksiz **RBAC/yetkilendirme** katmanına sahip (`lib/permissions`, `/rbac`, `RouteGuard`,
+`Can`) ama **kimlik doğrulama (authentication) TAMAMEN SAHTE**: `permission-context.tsx` sabit bir
+`DEFAULT_USER` ("Ahmet Yönetici", super-admin) döndürüyor, AppShell korumasız mount ediliyor,
+`UserMenu`'daki "Çıkış yap" ölü buton, `client.ts`'te token/401 yok, MSW'de auth endpoint yok.
+Bu arc o boşluğu **simüle backend'li (MSW)** gerçek auth ile kapatır. İç admin panel → self-signup YOK,
+adminler davetle oluşturulur.
+
+Arc planı (detay sırası gelince ilgili görev dosyasına yazılır):
+- **032 — Auth Core** (AKTİF): `/login` · oturum önyükleme (`GET /auth/me`) · `AuthGate` (RBAC RouteGuard'dan
+  ayrı ve önce) · çıkış (ölü butonu bağla) · `client.ts` Bearer+401 · `DEFAULT_USER` kaldır → gerçek auth store ·
+  auth audit. **Temel — onsuz 033/034 olmaz.**
+- **033 — Recovery & invite & 2FA:** `/forgot-password` · `/reset-password?token=` · `/accept-invite?token=` ·
+  şifre sonrası 2FA/TOTP adımı (`/login/2fa`).
+- **034 — Account security & session hardening:** `/account/security` (şifre değiştir · aktif oturumlar ·
+  "her yerden çık" · 2FA yönet) · idle-timeout re-auth modalı · token refresh · auth denetim geçmişi.
+
+Mode: TASK. Sıradaki adım: 032'yi uygula → verify (lint+typecheck+test+build) → `dod-reviewer` →
+PROGRESS checkpoint → 033 görev dosyasını yaz → CURRENT ilerle → DUR → kullanıcı commit → `/clear`.
+
+---
+
+## Archived: Enterprise İlanlar arc COMPLETE (Tasks 028 → 031 all done, ADR 0007).
 
 Delivered from the (now-removed) `docs/mockups/enterprise-listings.html` mockup (Calm Signal; no
 reference-palette clone): 028 column header filters (funnel, left of label) · 029 KPI strip + inline

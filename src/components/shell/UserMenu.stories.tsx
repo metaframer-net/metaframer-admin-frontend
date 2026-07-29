@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { MemoryRouter } from 'react-router-dom';
 import { expect, userEvent, within } from 'storybook/test';
 
 import { UserMenu } from './UserMenu';
@@ -7,6 +8,7 @@ const meta = {
   title: 'Shell/UserMenu',
   component: UserMenu,
   parameters: { layout: 'centered' },
+  decorators: [(Story) => <MemoryRouter><Story /></MemoryRouter>],
 } satisfies Meta<typeof UserMenu>;
 
 export default meta;

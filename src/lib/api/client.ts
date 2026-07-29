@@ -1,4 +1,5 @@
 import type { ListQuery, Paginated } from './types';
+import { emitUnauthorized, getAuthToken } from './auth-token';
 
 /** Base URL for the REST API. MSW intercepts this prefix in dev/test. */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -30,9 +31,17 @@ interface RequestOptions {
 
 async function request<T>(path: string, options: RequestOptions): Promise<T> {
   const { search, body, headers, method } = options;
+  // Inject the bearer token on every request when a session exists. MSW (and,
+  // later, FastAPI) reads it to resolve the current user; unauthenticated
+  // requests (e.g. POST /auth/login) simply omit the header.
+  const token = getAuthToken();
   const init: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json', ...(headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(headers ?? {}),
+    },
   };
   if (body !== undefined) init.body = body;
   const res = await fetch(buildUrl(path, search), init);
@@ -43,6 +52,11 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
     } catch {
       body = undefined;
     }
+    // A 401 while a token was attached means the session expired/was revoked.
+    // Signal the auth layer to drop it (the routed AuthGate then redirects to
+    // /login). Bad-credential 401s on /auth/login carry no token, so they never
+    // trip this — they surface to the login mutation as an ApiError instead.
+    if (res.status === 401 && token) emitUnauthorized();
     throw new ApiError(res.status, `Request failed: ${res.status} ${res.statusText}`, body);
   }
   if (res.status === 204) return undefined as T;
