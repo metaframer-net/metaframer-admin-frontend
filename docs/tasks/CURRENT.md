@@ -1,14 +1,20 @@
 # Current Task
 -> (none) — **Enterprise İlanlar arc COMPLETE** (Tasks 028 → 031 all done, ADR 0007).
 
-Delivered from `docs/mockups/enterprise-listings.html` (Calm Signal; no reference-palette clone):
-028 column header filters (funnel, left of label) · 029 KPI strip + inline status edit ·
-030 multi-view (table/kanban/gallery/map, `?view=`) · 031 create wizard rail + final-step preview.
+Delivered from the (now-removed) `docs/mockups/enterprise-listings.html` mockup (Calm Signal; no
+reference-palette clone): 028 column header filters (funnel, left of label) · 029 KPI strip + inline
+status edit · 030 multi-view (table/kanban/gallery/map, `?view=`) · 031 create wizard rail +
+final-step preview.
 Verified: typecheck/lint/build green; listings+data-table story tests green; real-app smoke 0 errors.
-Awaiting the user's phase-by-phase manual commits. Backlog empty until a new goal.
 
-Note: the working tree also carries PRE-EXISTING uncommitted edits NOT part of this arc
-(`CommandDock.tsx`, `DockLogo.tsx`, `permissions.ts`, `package.json`) — commit/resolve separately.
+**All of it is committed and pushed** — `main` == `origin/main` at `930b12b`, working tree clean
+(re-verified 2026-07-29 after syncing 17 commits from origin: `npm ci`, lint 0 errors / 15 warnings,
+`npm run build` green). Backlog empty until a new goal.
+
+Also landed alongside the arc (same push): `ai-first-sentinel` + `performance-sentinel` agents,
+the advisory mechanical Stop hook (`scripts/hooks/mechanical-check.sh`), the CI bundle-size budget
+(`scripts/check-bundle-size.mjs`), the chrome-devtools MCP (`.mcp.json`), the EdgeDock magnify+lens
+engine, the single-toggle command dock, and a dead-code/dependency prune.
 
 ---
 
