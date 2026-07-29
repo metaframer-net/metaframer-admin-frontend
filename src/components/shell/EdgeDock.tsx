@@ -19,14 +19,18 @@ interface DockItem {
   entity: string;
 }
 
-/* macOS-style magnification tuning (our own values). */
-const BASE = 44; // icon box size (px) — meets the 44px touch-target rule at base scale
-const GAP = 8;
+/* macOS-style magnification tuning (our own values, reference proportions). */
+const BASE = 38; // visual tile size (px)
+const GAP = 6;
 const MIN = 1;
 const MAX = 1.5;
-const EFFECT = 170; // proximity falloff window along the main axis (px)
-/* Dual-speed lerp (matches the GlassDock reference): quicker while the pointer drives
-   the dock, softer as it eases back to rest. Applied per-frame in the rAF loop. */
+const EFFECT = 180; // proximity falloff window along the main axis (px)
+/* The visual tile is 38px but the POINTER TARGET is 44px (`after:size-11` on the
+   tile): an invisible overflow grows the hit box to the project's touch-target rule
+   without fattening the icon row. Tiles are pitched BASE+GAP = 44px apart, so the
+   enlarged targets tile the row exactly and never overlap (WCAG 2.5.8). */
+/* Dual-speed lerp: quicker while the pointer drives the dock, softer as it eases
+   back to rest. Applied per-frame in the rAF loop. */
 const LERP_IN = 0.2;
 const LERP_OUT = 0.12;
 /* How close (px) the pointer must get to the collapsed hint before the dock opens — a
@@ -73,6 +77,15 @@ function positionsFromScales(scales: number[]): number[] {
   return out;
 }
 
+/** Total magnified length of the row — the size the track (and the glass capsule
+ * around it) must take so a grown icon never spills outside the dock. */
+function extentOf(centers: number[], scales: number[], fallback: number): number {
+  if (centers.length === 0) return fallback;
+  const lastCenter = centers[centers.length - 1] ?? 0;
+  const lastScale = scales[scales.length - 1] ?? MIN;
+  return lastCenter + (BASE * lastScale) / 2;
+}
+
 /** Build the shared dock item list (permitted primary modules + ⌘K "all"). */
 function useDockItems(): DockItem[] {
   const items = usePrimaryNav(5);
@@ -114,8 +127,19 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/** A single icon tile — a nav link or the ⌘K button. No background fill: the sliding
- * lens is the sole positional highlight, so nothing else "pops" a competing circle. */
+/**
+ * Magnification is a hovering-cursor affordance, so a finger dragging across the rail
+ * must not drive it. This asks the EVENT what kind of pointer it came from rather
+ * than asking the device via `(hover: hover)` — that media query reports false on
+ * plenty of real desktop setups (remote/automated sessions among them), which would
+ * silently kill magnification for a mouse user. Only genuine touch is rejected.
+ */
+function isHoveringPointer(e: PointerEvent): boolean {
+  return e.pointerType !== 'touch';
+}
+
+/** A single icon tile — a nav link or the ⌘K button. It carries no fill of its own:
+ * the lens behind it is the only surface, so exactly one circle is ever visible. */
 function DockTile({
   item,
   edge,
@@ -126,10 +150,10 @@ function DockTile({
   onNavigate?: (() => void) | undefined;
 }) {
   const Icon = item.icon;
-  // The always-on lens marks the icon nearest the cursor; while it is following the
-  // pointer/keyboard focus elsewhere, the active route needs a NON-color cue too
-  // (Golden Rule: color is never the sole signal). A tiny persistent dot on the outer
-  // edge provides that — dock-idiomatic (macOS "running app" dot).
+  // The lens rests on the active item, but it LEAVES to follow the cursor, and its
+  // tint is colour either way — so the active route needs a NON-colour cue that
+  // stays put (Golden Rule: colour is never the sole signal). A tiny persistent dot
+  // on the outer edge provides it — dock-idiomatic (macOS "running app" dot).
   const dotPos =
     edge === 'bottom'
       ? 'bottom-0.5 left-1/2 -translate-x-1/2'
@@ -138,7 +162,7 @@ function DockTile({
         : 'right-0.5 top-1/2 -translate-y-1/2';
   const inner = (
     <>
-      <Icon className="size-5" aria-hidden="true" />
+      <Icon className="size-[1.125rem]" aria-hidden="true" />
       {item.active && (
         <span
           aria-hidden="true"
@@ -147,8 +171,11 @@ function DockTile({
       )}
     </>
   );
+  // `after:size-11` grows the pointer target from the 38px tile to 44px without
+  // changing the layout box the magnification math is built on.
   const cls = cn(
     'focus-visible:ring-ring relative flex size-full items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2',
+    'after:absolute after:left-1/2 after:top-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[""]',
     item.active ? 'text-primary' : 'text-glass-foreground/80 hover:text-glass-foreground',
   );
   return item.to ? (
@@ -182,16 +209,26 @@ function DockTile({
 }
 
 /**
- * Magnifying dock for ALL three edges (bottom = horizontal, left/right = vertical).
- * macOS-style cosine magnification toward the cursor PLUS an always-visible "lens"
- * indicator that reinterprets the GlassDock reference: at rest it sits on the active
- * item; as the pointer moves it GLIDES to the nearest icon (its opacity never
- * animates — no "appearing" circle). A single requestAnimationFrame lerp loop drives
- * both the magnification and the lens glide (LERP_IN while pointing, LERP_OUT easing
- * back), so there is no stepped CSS-transition feel. The loop runs only while the dock
- * is in motion and cancels itself once settled. Under reduced-motion / touch (no
- * pointer) it is a calm static row: no magnify, and the lens snaps (no glide) to the
- * hovered or active item. Reinterpreted in OUR glass + tokens (Golden Rule 1/2).
+ * Magnifying dock rail for ALL three edges (bottom = horizontal, left/right =
+ * vertical). macOS-style cosine magnification toward the cursor, driven by a single
+ * requestAnimationFrame lerp loop (LERP_IN while pointing, LERP_OUT easing back) so
+ * there is no stepped CSS-transition feel. The loop runs only while the dock is in
+ * motion and cancels itself once settled.
+ *
+ * Two surfaces move with the pointer:
+ * - the TRACK grows to the magnified length, so the glass capsule widens with the
+ *   icons instead of letting a grown icon spill past its edge;
+ * - the LENS — a circle behind the icons — rests on the active route and glides to
+ *   whichever icon the cursor or keyboard focus is on, taking that icon's scale.
+ *
+ * Because the stage is centred on its edge, the track's CENTRE is the one invariant
+ * anchor while its box grows, so the pointer is measured against that centre and
+ * converted to resting coordinates — measuring off the moving left edge would feed
+ * the growth back into the pointer position and oscillate.
+ *
+ * Without a fine pointer (touch) or under reduced motion it is a calm static row: no
+ * magnification, no growth, and the lens simply sits on the active item.
+ * Reinterpreted in OUR glass + tokens (Golden Rule 1/2).
  */
 function MagnifyDock({
   items,
@@ -203,9 +240,9 @@ function MagnifyDock({
   edge: DockEdge;
 }) {
   const axis: 'x' | 'y' = edge === 'bottom' ? 'x' : 'y';
-  const reduced = usePrefersReducedMotion();
+  const magnify = !usePrefersReducedMotion();
   // -1 when the current route matches no dock item — the lens then shows nothing at
-  // rest (mirrors the old SideDock's "no highlight when nothing is active").
+  // rest instead of falsely marking the first icon.
   const activeIdx = items.findIndex((i) => i.active);
   const count = items.length;
   const restExtent = count * (BASE + GAP) - GAP;
@@ -235,23 +272,20 @@ function MagnifyDock({
     let running = false;
     let raf = 0;
 
-    /** Magnified centers for the current `scales`, re-centered so the group spills
-     * evenly to both sides of the resting track instead of drifting one way. */
+    /** Magnified centers for the current `scales`. No re-centering: the track itself
+     * grows, so the row spreads outward from its start exactly like the macOS dock. */
     function layout(): number[] {
-      const p = positionsFromScales(scales);
-      const lastP = p[p.length - 1] ?? 0;
-      const lastS = scales[scales.length - 1] ?? MIN;
-      const ext = p.length ? lastP + (BASE * lastS) / 2 : restExtent;
-      const off = (restExtent - ext) / 2;
-      return p.map((v) => v + off);
+      return positionsFromScales(scales);
     }
 
-    // Index of the icon whose (magnified) center is closest to pointer `p`.
-    function nearest(centers: number[], p: number): number {
+    /** Index of the icon nearest pointer `p`. Compared in RESTING coordinates (the
+     * space `p` is measured in) — magnification is monotonic, so the nearest resting
+     * center is also the nearest magnified one. */
+    function nearest(p: number): number {
       let idx = 0;
       let best = Infinity;
-      for (let i = 0; i < centers.length; i += 1) {
-        const d = Math.abs((centers[i] ?? 0) - p);
+      for (let i = 0; i < count; i += 1) {
+        const d = Math.abs(restCenter(i) - p);
         if (d < best) {
           best = d;
           idx = i;
@@ -279,6 +313,11 @@ function MagnifyDock({
     }
 
     function paint(centers: number[]) {
+      // Grow the track (and with it the glass capsule that wraps it) to the row's
+      // magnified length, so icons swell the dock instead of overflowing it.
+      const ext = extentOf(centers, scales, restExtent);
+      if (axis === 'x') track.style.width = `${ext}px`;
+      else track.style.height = `${ext}px`;
       for (let i = 0; i < tiles.length; i += 1) {
         const t = tiles[i];
         if (!t) continue;
@@ -311,7 +350,7 @@ function MagnifyDock({
 
     function frame() {
       const k = pointer !== null ? LERP_IN : LERP_OUT;
-      const wanted = scalesFor(pointer, count);
+      const wanted = scalesFor(magnify ? pointer : null, count);
       let moving = false;
       for (let i = 0; i < count; i += 1) {
         const s = scales[i] ?? MIN;
@@ -321,10 +360,10 @@ function MagnifyDock({
         scales[i] = next;
       }
       const centers = layout();
-      // Lens target: the hovered icon while pointing, else the active item — or NOTHING
-      // (idx < 0) when the route matches no dock item, in which case the lens eases to
-      // scale 0 (hidden) instead of falsely marking the first icon.
-      const idx = pointer !== null ? nearest(centers, pointer) : activeIdx;
+      // Lens target: the hovered/focused icon while pointing, else the active item —
+      // or NOTHING (idx < 0) when the route matches no dock item, in which case it
+      // eases to scale 0 rather than parking on an arbitrary icon.
+      const idx = pointer !== null ? nearest(pointer) : activeIdx;
       const hasTarget = idx >= 0;
       const targetCenter = hasTarget ? (centers[idx] ?? restCenter(idx)) : lensCenter;
       const targetScale = hasTarget ? (scales[idx] ?? MIN) : 0;
@@ -351,13 +390,13 @@ function MagnifyDock({
       }
     }
 
-    /** Reduced-motion / touch: no magnify, no glide — the lens snaps to `idx`, or hides
-     * (scale 0) when `idx < 0` (no active item). */
+    /** No magnification available (touch / reduced motion): a flat resting row with
+     * the lens snapped onto `idx`, or hidden when nothing is active. */
     function snap(idx: number) {
       scales = items.map(() => MIN);
       const centers = layout();
       if (idx >= 0) {
-        lensCenter = restCenter(idx);
+        lensCenter = centers[idx] ?? restCenter(idx);
         lensScale = MIN;
       } else {
         lensScale = 0;
@@ -369,70 +408,77 @@ function MagnifyDock({
 
     // Initial rest paint (pre-browser-paint via useLayoutEffect → no first-frame flash):
     // lens on the active item, or hidden when nothing is active.
-    if (reduced) snap(activeIdx);
-    else paint(layout());
+    snap(activeIdx);
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
+      if (!isHoveringPointer(e)) return;
       const r = track.getBoundingClientRect();
-      const p = axis === 'x' ? e.clientX - r.left : e.clientY - r.top;
+      // Measure against the track's CENTRE and convert to resting coordinates. The box
+      // grows symmetrically around that centre (the rail is edge-centred), so the
+      // centre is invariant; reading the moving left/top edge instead would feed the
+      // growth straight back into the pointer position.
+      const p =
+        axis === 'x'
+          ? e.clientX - (r.left + r.width / 2) + restExtent / 2
+          : e.clientY - (r.top + r.height / 2) + restExtent / 2;
       pointer = p;
-      if (reduced) snap(nearest(layout(), p));
-      else ensureLoop();
+      if (magnify) ensureLoop();
+      else snap(nearest(p));
     };
     const onLeave = () => {
       pointer = null;
-      if (reduced) snap(activeIdx);
-      else ensureLoop();
+      if (magnify) ensureLoop();
+      else snap(activeIdx);
     };
-    // Keyboard: focusing a tile drives the same magnify/lens toward that icon, so
-    // keyboard users get the identical positional cue + floating label as the mouse.
+    // Keyboard: focusing a tile drives the same magnification and lens toward that
+    // icon, so keyboard users get the identical positional cue + floating label.
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as Node;
       const idx = tiles.findIndex((t) => t?.contains(target));
       if (idx < 0) return;
       pointer = restCenter(idx);
-      if (reduced) snap(idx);
-      else ensureLoop();
+      if (magnify) ensureLoop();
+      else snap(idx);
     };
     const onFocusOut = (e: FocusEvent) => {
       if (track.contains(e.relatedTarget as Node | null)) return;
       pointer = null;
-      if (reduced) snap(activeIdx);
-      else ensureLoop();
+      if (magnify) ensureLoop();
+      else snap(activeIdx);
     };
 
-    track.addEventListener('mousemove', onMove);
-    track.addEventListener('mouseleave', onLeave);
+    track.addEventListener('pointermove', onMove);
+    track.addEventListener('pointerleave', onLeave);
     track.addEventListener('focusin', onFocusIn);
     track.addEventListener('focusout', onFocusOut);
     return () => {
       cancelAnimationFrame(raf);
-      track.removeEventListener('mousemove', onMove);
-      track.removeEventListener('mouseleave', onLeave);
+      track.removeEventListener('pointermove', onMove);
+      track.removeEventListener('pointerleave', onLeave);
       track.removeEventListener('focusin', onFocusIn);
       track.removeEventListener('focusout', onFocusOut);
     };
-  }, [items, edge, axis, reduced, activeIdx, count, restExtent]);
+  }, [items, edge, axis, magnify, activeIdx, count, restExtent]);
 
-  const trackStyle =
-    axis === 'x'
-      ? { width: restExtent, height: BASE }
-      : { height: restExtent, width: BASE };
+  const trackStyle = axis === 'x' ? { width: restExtent, height: BASE } : { height: restExtent, width: BASE };
 
   return (
     <div ref={trackRef} className="relative" style={trackStyle}>
-      {/* Always-on selection lens — decorative; the tiles carry the accessible names. */}
+      {/* The hover circle: a lens behind the icons, decorative — the tiles carry the
+          accessible names. */}
       <span
         ref={lensRef}
         aria-hidden="true"
+        data-slot="edge-dock-lens"
         className="bg-glass-lens shadow-lens pointer-events-none absolute z-0 rounded-full"
         style={{ width: BASE, height: BASE }}
       />
-      {/* Floating label for the icon nearest the cursor / keyboard focus. */}
+      {/* Floating label for the icon under the cursor / keyboard focus. */}
       <span
         ref={tipRef}
         aria-hidden="true"
-        className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs opacity-0 shadow-md transition-opacity duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none"
+        data-slot="edge-dock-label"
+        className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 whitespace-nowrap rounded-full border px-2.5 py-0.5 font-mono text-[0.625rem] font-bold uppercase tracking-[0.18em] opacity-0 shadow-md transition-opacity duration-[var(--duration-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none"
       />
       {items.map((item, i) => (
         <div
@@ -465,6 +511,8 @@ interface EdgeShell {
   origin: string;
   /** Heartbeat phase-offset so the edges don't pulse in unison (token-scaled). */
   pulseDelay: string;
+  /** Capsule padding — thin across the rail, generous along it. */
+  padding: string;
   label: string;
 }
 
@@ -478,9 +526,12 @@ const SHELL: Record<DockEdge, EdgeShell> = {
     // right by the tab with no gap; it just slides up + fades in.
     stagePos: 'bottom-0 left-1/2',
     stageOpen: '-translate-x-1/2 translate-y-0 scale-100 opacity-100',
-    stageClosed: '-translate-x-1/2 translate-y-4 scale-95 opacity-0',
+    // Travels its full height plus a margin, so the dock genuinely flies up from
+    // off-screen and the spring has distance to settle over.
+    stageClosed: '-translate-x-1/2 translate-y-[calc(100%+2.5rem)] scale-90 opacity-0',
     origin: 'origin-bottom',
     pulseDelay: 'calc(var(--stagger-step) * 6)',
+    padding: 'px-2 py-1.5',
     label: 'alt',
   },
   left: {
@@ -489,9 +540,10 @@ const SHELL: Record<DockEdge, EdgeShell> = {
     hintBar: 'h-24 w-5 rounded-r-2xl',
     stagePos: 'left-0 top-1/2',
     stageOpen: '-translate-y-1/2 translate-x-0 scale-100 opacity-100',
-    stageClosed: '-translate-y-1/2 -translate-x-4 scale-95 opacity-0',
+    stageClosed: '-translate-y-1/2 -translate-x-[calc(100%+2.5rem)] scale-90 opacity-0',
     origin: 'origin-left',
     pulseDelay: 'calc(var(--stagger-step) * 12)',
+    padding: 'px-1.5 py-2',
     label: 'sol',
   },
   right: {
@@ -500,21 +552,24 @@ const SHELL: Record<DockEdge, EdgeShell> = {
     hintBar: 'h-24 w-5 rounded-l-2xl',
     stagePos: 'right-0 top-1/2',
     stageOpen: '-translate-y-1/2 translate-x-0 scale-100 opacity-100',
-    stageClosed: '-translate-y-1/2 translate-x-4 scale-95 opacity-0',
+    stageClosed: '-translate-y-1/2 translate-x-[calc(100%+2.5rem)] scale-90 opacity-0',
     origin: 'origin-right',
     pulseDelay: 'calc(var(--stagger-step) * 24)',
+    padding: 'px-1.5 py-2',
     label: 'sağ',
   },
 };
 
 /**
  * A collapsible edge navigation dock (dock layout, desktop AND mobile). Collapsed it is
- * a small rich-glass hint tab hugging the edge; hover / keyboard-focus / tap slides the
- * dock in. The revealed dock is a macOS-style magnifying dock on ALL three edges (icons
- * grow toward the cursor) with an always-on lens that glides to the hovered/active icon.
- * Up to three frame the viewport, each independently flag-gated from Settings; all share
- * one nav source (usePrimaryNav). Golden Rule 1: reinterpreted in OUR glass + motion
- * tokens — NOT a clone of the reference's liquid-glass chrome.
+ * a small rich-glass hint tab hugging the edge; hover / keyboard-focus / tap flies the
+ * dock in on the spring curve. It stays COLLAPSED at rest on purpose: up to three of
+ * these frame the viewport, and three standing rails would wall the content in.
+ * The revealed dock is a macOS-style magnifying dock on all three edges — icons grow
+ * toward the cursor, the capsule grows with them, and a circular lens slides onto the
+ * icon under the pointer. Each edge is independently flag-gated from Settings; all
+ * share one nav source (usePrimaryNav). Golden Rule 1: reinterpreted in OUR glass +
+ * motion tokens — NOT a clone of the reference's liquid-glass chrome.
  */
 export function EdgeDock({ edge }: { edge: DockEdge }) {
   const items = useDockItems();
@@ -539,7 +594,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
   // hint (or, while open, the revealed panel), and close when it moves beyond that zone —
   // unless keyboard focus is still inside. This only READS the pointer position (no
   // invisible overlay), so it never blocks clicks on the content underneath. Touch and
-  // keyboard paths are unaffected (no mousemove fires on touch).
+  // keyboard paths are unaffected (a tap fires no hovering pointermove).
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
@@ -549,7 +604,8 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
       y >= r.top - PROXIMITY &&
       y <= r.bottom + PROXIMITY;
     let last = 0;
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
+      if (!isHoveringPointer(e)) return;
       const now = performance.now();
       if (now - last < 40) return; // throttle the getBoundingClientRect reads
       last = now;
@@ -561,8 +617,8 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
       if (near) setOpen(true);
       else if (!wrapper.contains(document.activeElement)) setOpen(false);
     };
-    window.addEventListener('mousemove', onMove, { passive: true });
-    return () => window.removeEventListener('mousemove', onMove);
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => window.removeEventListener('pointermove', onMove);
   }, []);
 
   const closeIfOutside = (next: Element | null) => {
@@ -629,7 +685,10 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
         id={stageId}
         inert={!open}
         className={cn(
-          'absolute transition-[transform,opacity] duration-[var(--duration-base)] ease-[var(--ease-standard)] motion-reduce:transition-none',
+          // Transform rides the overshoot; opacity is deliberately quicker and on a
+          // plain curve so the dock is legible for the whole arrival instead of
+          // fading in only as it lands.
+          'absolute transition-[transform,opacity] [transition-duration:var(--duration-reveal),var(--duration-base)] [transition-timing-function:var(--ease-spring),var(--ease-standard)] motion-reduce:transition-none',
           cfg.stagePos,
           cfg.origin,
           open ? cfg.stageOpen : cn('pointer-events-none', cfg.stageClosed),
@@ -639,8 +698,10 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
           aria-label={`Kenar gezinme (${cfg.label})`}
           className={cn(
             'bg-glass text-glass-foreground border-glass-border m-1 flex items-center rounded-full border shadow-lg backdrop-blur-md',
-            edge === 'bottom' ? 'px-2 py-1.5' : 'px-1.5 py-2',
+            cfg.padding,
           )}
+          // The magnified row overflows the capsule's own padding box while it grows;
+          // clipping it would chop the swollen icon.
           style={{ overflow: 'visible' }}
         >
           <MagnifyDock items={items} onNavigate={() => setOpen(false)} edge={edge} />

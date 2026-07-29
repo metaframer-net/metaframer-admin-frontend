@@ -6,17 +6,12 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { exportCsv, exportXls } from '@/lib/export';
 import { Can } from '@/lib/permissions/permission-context';
-import {
-  PACKAGE_KINDS,
-  PACKAGE_KIND_LABELS,
-  PACKAGE_STATUSES,
-  PACKAGE_STATUS_LABELS,
-} from '../data/promotions';
+import { PACKAGE_KIND_LABELS, PACKAGE_STATUS_LABELS } from '../data/promotions';
+import { packageFilters } from '../data/filters';
 import { packageColumns, type PackageTableMeta } from '../components/packageColumns';
 import { PackageFormDialog } from '../components/PackageFormDialog';
 import { PackageStatusBadge } from '../components/PackageStatusBadge';
@@ -24,23 +19,6 @@ import { PackageKindBadge } from '../components/PackageKindBadge';
 import { usePackages, packageKeys } from '../api/queries';
 import { useArchivePackage, useUpsertPackage } from '../api/mutations';
 import { formatTry, packageFormToPayload, sortByOrder, type DopingPackage } from '../schemas/promotion';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: PACKAGE_STATUSES.map((s) => ({ value: s, label: PACKAGE_STATUS_LABELS[s] })),
-  },
-  {
-    id: 'kind',
-    label: 'Tür',
-    kind: 'faceted',
-    multiple: true,
-    options: PACKAGE_KINDS.map((k) => ({ value: k, label: PACKAGE_KIND_LABELS[k] })),
-  },
-];
 
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
@@ -102,12 +80,20 @@ export function PackagesListPage() {
         filterBar={
           <FilterBar
             tableKey="packages"
-            filters={filters}
+            filters={packageFilters}
             state={state}
             searchPlaceholder="Paket adı ara…"
             onNaturalLanguage={parseNaturalLanguage}
           />
         }
+        renderSubRow={(row) => (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+            <Detail label="Paket No" value={row.id} />
+            <Detail label="Tür" value={PACKAGE_KIND_LABELS[row.kind]} />
+            <Detail label="Süre" value={`${row.durationDays} gün`} />
+            <Detail label="Sıra" value={String(row.order + 1)} />
+          </div>
+        )}
         renderMobileCard={(row, selected, toggle) => (
           <MobileListCard
             title={row.name}
@@ -204,5 +190,14 @@ function BulkPackageActions({ packages, clear }: { packages: DopingPackage[]; cl
         onConfirm={run}
       />
     </Can>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="break-all tabular-nums">{value}</dd>
+    </div>
   );
 }

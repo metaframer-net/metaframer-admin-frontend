@@ -7,29 +7,19 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api } from '@/lib/api/client';
 import { Can } from '@/lib/permissions/permission-context';
-import { CATEGORY_STATUSES, CATEGORY_STATUS_LABELS } from '../data/categories';
+import { CATEGORY_STATUS_LABELS } from '../data/categories';
+import { categoryFilters } from '../data/filters';
 import { categoryColumns, type CategoryTableMeta } from '../components/categoryColumns';
 import { CategoryStatusBadge } from '../components/CategoryStatusBadge';
 import { CategoryFormDialog } from '../components/CategoryFormDialog';
 import { useCategories, categoryKeys } from '../api/queries';
 import { useReorderCategories, useUpsertCategory } from '../api/mutations';
 import { sortByOrder, type Category } from '../schemas/category';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: CATEGORY_STATUSES.map((s) => ({ value: s, label: CATEGORY_STATUS_LABELS[s] })),
-  },
-];
 
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
@@ -104,7 +94,7 @@ export function CategoriesListPage() {
         filterBar={
           <FilterBar
             tableKey="categories"
-            filters={filters}
+            filters={categoryFilters}
             state={state}
             searchPlaceholder="Kategori adı veya anahtar ara…"
             onNaturalLanguage={parseNaturalLanguage}

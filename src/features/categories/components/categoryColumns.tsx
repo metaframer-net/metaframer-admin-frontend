@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { statusFilter } from '../data/filters';
 import type { Category } from '../schemas/category';
 import { CategoryStatusBadge } from './CategoryStatusBadge';
 
@@ -104,6 +105,7 @@ export const categoryColumns: ColumnDef<Category>[] = [
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => <CategoryStatusBadge status={getValue<Category['status']>()} />,
   },
   {

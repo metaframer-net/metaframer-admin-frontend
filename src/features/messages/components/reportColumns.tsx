@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { REPORT_SUBJECT_TYPE_LABELS } from '../data/reports';
+import { priorityFilter, reasonCategoryFilter, statusFilter, subjectTypeFilter } from '../data/filters';
 import type { Report } from '../schemas/report';
 import { ReportStatusBadge } from './ReportStatusBadge';
 import { ReportPriorityBadge } from './ReportPriorityBadge';
@@ -47,21 +48,25 @@ export const reportColumns: ColumnDef<Report>[] = [
   {
     accessorKey: 'subjectType',
     header: 'Tür',
+    meta: { filter: subjectTypeFilter },
     cell: ({ getValue }) => REPORT_SUBJECT_TYPE_LABELS[getValue<Report['subjectType']>()],
   },
   {
     accessorKey: 'reasonCategory',
     header: 'Sebep',
+    meta: { filter: reasonCategoryFilter },
     cell: ({ getValue }) => <ReasonCategoryBadge category={getValue<Report['reasonCategory']>()} />,
   },
   {
     accessorKey: 'priority',
     header: 'Öncelik',
+    meta: { filter: priorityFilter },
     cell: ({ getValue }) => <ReportPriorityBadge priority={getValue<Report['priority']>()} />,
   },
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => <ReportStatusBadge status={getValue<Report['status']>()} />,
   },
   {

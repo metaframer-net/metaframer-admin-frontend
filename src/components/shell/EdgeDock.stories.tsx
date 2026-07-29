@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { EdgeDock } from './EdgeDock';
 import { CommandPaletteProvider } from './command-palette-context';
@@ -24,8 +24,8 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Bottom edge — a collapsed hint tab that opens (hover / focus / tap) into a
- * macOS-style magnifying dock. Play asserts the collapse→open result (nav links +
- * ⌘K + active route), not the pointer-driven magnification.
+ * macOS-style magnifying dock. It rests COLLAPSED: three standing rails would wall
+ * the content in. Play asserts the collapse→open result, not the magnification.
  */
 export const Bottom: Story = {
   args: { edge: 'bottom' },
@@ -42,7 +42,7 @@ export const Bottom: Story = {
   },
 };
 
-/** Left edge — vertical magnifying dock with an always-on lens that glides to the hover. */
+/** Left edge — vertical magnifying dock; the capsule grows along its own axis. */
 export const Left: Story = {
   args: { edge: 'left' },
   play: async () => {
@@ -65,23 +65,67 @@ export const Right: Story = {
 };
 
 /**
- * Keyboard: focusing the hint opens the dock; Escape closes it and restores focus —
+ * Keyboard: focusing the hint opens the dock and Escape closes it, restoring focus —
  * INCLUDING after focus has tabbed into the tiles (regression guard: the hint's focus
- * handler must not re-open the dock while focus is being restored on Escape).
+ * handler must not re-open the dock while focus is being restored). Focusing a tile
+ * also drives the floating label, exactly as hovering does.
  */
 export const Keyboard: Story = {
   args: { edge: 'bottom' },
   play: async () => {
     const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
     hint.focus();
-    await expect(hint).toHaveFocus();
     await expect(hint).toHaveAttribute('aria-expanded', 'true');
-    // Move focus off the hint into a nav tile, then Escape from there.
+
+    // Move focus off the hint into the first nav tile — the label follows it.
     await userEvent.tab();
-    await expect(hint).not.toHaveFocus();
+    const label = document.body.querySelector('[data-slot="edge-dock-label"]');
+    if (!(label instanceof HTMLElement)) throw new Error('dock label did not render');
+    await waitFor(() => expect(label.textContent).toBe('Genel Bakış'));
+
     await userEvent.keyboard('{Escape}');
     await expect(hint).toHaveAttribute('aria-expanded', 'false');
     await expect(hint).toHaveFocus();
+  },
+};
+
+/**
+ * Hovering an icon slides the circular lens onto it (regression guard for the
+ * "hover → circle" contract): the lens starts on the active route and moves to the
+ * pointed-at tile, taking that tile's magnified scale.
+ */
+export const HoverLens: Story = {
+  args: { edge: 'bottom' },
+  play: async () => {
+    await userEvent.click(within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const track = document.body.querySelector('[data-slot="edge-dock"] nav > div');
+    const lens = document.body.querySelector('[data-slot="edge-dock-lens"]');
+    if (!(track instanceof HTMLElement) || !(lens instanceof HTMLElement)) {
+      throw new Error('dock track/lens did not render');
+    }
+    const restLeft = lens.style.left;
+
+    // Point at the LAST tile (the ⌘K action) — never the resting active one.
+    const box = track.getBoundingClientRect();
+    const y = box.y + box.height / 2;
+    for (let i = 0; i < 24; i += 1) {
+      track.dispatchEvent(
+        new PointerEvent('pointermove', {
+          pointerType: 'mouse',
+          clientX: box.right - 12,
+          clientY: y,
+          bubbles: true,
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    await expect(lens.style.left).not.toBe(restLeft);
+    const tiles = Array.from(track.children).filter((el): el is HTMLElement => el instanceof HTMLDivElement);
+    const last = tiles[tiles.length - 1];
+    if (!last) throw new Error('no dock tiles');
+    // The lens has landed on the pointed-at tile (same left, within a pixel).
+    await expect(Math.abs(parseFloat(lens.style.left) - parseFloat(last.style.left))).toBeLessThan(1.5);
   },
 };
 
@@ -93,6 +137,49 @@ export const Keyboard: Story = {
 export const Loading: Story = { args: { edge: 'bottom' } };
 export const Empty: Story = { args: { edge: 'bottom' } };
 export const ErrorState: Story = { args: { edge: 'bottom' }, name: 'Error' };
+
+/**
+ * Magnification GROWS the capsule (regression guard). The dock used to keep its
+ * resting length and re-centre the row inside it, so a magnified icon spilled past the
+ * glass edge. Driving the pointer across the track must widen the capsule and keep
+ * every tile inside it.
+ */
+export const MagnifiesAndGrows: Story = {
+  args: { edge: 'bottom' },
+  play: async () => {
+    await userEvent.click(within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const track = document.body.querySelector('[data-slot="edge-dock"] nav > div');
+    const capsule = track?.parentElement;
+    if (!(track instanceof HTMLElement) || !(capsule instanceof HTMLElement)) {
+      throw new Error('dock track did not render');
+    }
+    const restWidth = capsule.getBoundingClientRect().width;
+
+    // Drive the pointer to the middle of the row and let the rAF lerp settle.
+    const box = track.getBoundingClientRect();
+    const midX = box.x + box.width / 2;
+    const midY = box.y + box.height / 2;
+    for (let i = 0; i < 24; i += 1) {
+      track.dispatchEvent(
+        new PointerEvent('pointermove', { pointerType: 'mouse', clientX: midX, clientY: midY, bubbles: true }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    const grown = capsule.getBoundingClientRect();
+    await expect(grown.width).toBeGreaterThan(restWidth);
+
+    // No tile may stick out of the capsule on either side. (Tiles are the <div>
+    // children; the floating label is a <span> and deliberately sits outside.)
+    const tiles = Array.from(track.children).filter((el): el is HTMLElement => el instanceof HTMLDivElement);
+    await expect(tiles.length).toBeGreaterThan(1);
+    for (const tile of tiles) {
+      const b = tile.getBoundingClientRect();
+      await expect(b.left).toBeGreaterThanOrEqual(grown.left);
+      await expect(b.right).toBeLessThanOrEqual(grown.right);
+    }
+  },
+};
 
 /** Visible on mobile too — the collapsed hint tab renders and opens at a phone width. */
 export const MobileVisible: Story = {

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ChevronRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,23 +84,8 @@ export const demoColumns: ColumnDef<DemoRow>[] = [
       />
     ),
   },
-  {
-    id: 'expand',
-    enableSorting: false,
-    enableHiding: false,
-    size: 40,
-    header: () => null,
-    cell: ({ row }) => (
-      <button
-        type="button"
-        onClick={() => row.toggleExpanded()}
-        aria-label={row.getIsExpanded() ? 'Detayı kapat' : 'Detayı aç'}
-        className="hover:bg-accent inline-flex size-6 items-center justify-center rounded"
-      >
-        <ChevronRight className={`size-4 transition-transform ${row.getIsExpanded() ? 'rotate-90' : ''}`} />
-      </button>
-    ),
-  },
+  // No expand column here: the DataTable injects one automatically whenever a
+  // `renderSubRow` is passed, so every table gets the identical affordance.
   { accessorKey: 'title', header: 'Başlık', cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span> },
   { accessorKey: 'category', header: 'Kategori', meta: { filter: categoryFilter } },
   {
@@ -158,7 +142,7 @@ function query(rows: DemoRow[], q: ReturnType<typeof useTableUrlState>['query'])
 }
 
 /** Full DataTable demo wired to URL state — used across stories. */
-export function DataTableDemo({ columnControls = false }: { columnControls?: boolean } = {}) {
+export function DataTableDemo() {
   const state = useTableUrlState({ defaultPageSize: 10 });
   const filtered = useMemo(() => query(DEMO_ROWS, state.query), [state.query]);
   const page = state.pagination.pageIndex;
@@ -172,7 +156,6 @@ export function DataTableDemo({ columnControls = false }: { columnControls?: boo
         total={filtered.length}
         state={state}
         getRowId={(r) => r.id}
-        columnControls={columnControls}
         filterBar={<FilterBar tableKey="demo" filters={filters} state={state} searchPlaceholder="İlan ara…" />}
         renderSubRow={(row) => (
           <div className="text-sm">

@@ -82,3 +82,19 @@ export const Error: Story = {
     await expect(canvas.getByRole('button', { name: 'Tekrar dene' })).toBeInTheDocument();
   },
 };
+
+/**
+ * Structural parity (DATA_TABLE_SPEC): every filterable column carries a header
+ * funnel that writes to the same URL-synced state as the toolbar, and the
+ * DataTable supplies the expand toggle for the detail sub-row.
+ */
+export const ColumnFilters: Story = {
+  play: async ({ canvas }) => {
+    for (const label of ['Tarih', 'Aktör', 'İşlem türü']) {
+      await expect(
+        canvas.getByRole('button', { name: `${label} sütununu filtrele` }),
+      ).toBeInTheDocument();
+    }
+    await expect(canvas.getAllByRole('button', { name: 'Detayı aç' }).length).toBeGreaterThan(0);
+  },
+};

@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { LOCATIONS } from '@/features/listings/data/taxonomy';
 import { USER_TYPE_LABELS } from '../data/users';
+import { ilFilter, statusFilter, trustFilter, typeFilter, verificationFilter } from '../data/filters';
 import type { User } from '../schemas/user';
 import { UserStatusBadge } from './UserStatusBadge';
 import { TrustScoreMeter } from './TrustScoreMeter';
@@ -43,16 +44,19 @@ export const userColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'type',
     header: 'Tip',
+    meta: { filter: typeFilter },
     cell: ({ getValue }) => USER_TYPE_LABELS[getValue<User['type']>()],
   },
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => <UserStatusBadge status={getValue<User['status']>()} />,
   },
   {
     accessorKey: 'trustScore',
     header: 'Güven',
+    meta: { filter: trustFilter },
     cell: ({ getValue }) => (
       <div className="w-32">
         <TrustScoreMeter score={getValue<number>()} compact />
@@ -64,6 +68,7 @@ export const userColumns: ColumnDef<User>[] = [
     accessorKey: 'verification',
     header: 'Doğrulama',
     enableSorting: false,
+    meta: { filter: verificationFilter },
     cell: ({ row }) => <VerificationBadges verification={row.original.verification} hideNone />,
   },
   {
@@ -74,6 +79,7 @@ export const userColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'il',
     header: 'Şehir',
+    meta: { filter: ilFilter },
     cell: ({ getValue }) => LOCATIONS[getValue<string>()]?.label ?? getValue<string>(),
   },
   {

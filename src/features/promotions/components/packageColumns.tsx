@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { packageKindFilter, packageStatusFilter } from '../data/filters';
 import { formatTry, type DopingPackage, type PackageFormValues } from '../schemas/promotion';
 import { PackageKindBadge } from './PackageKindBadge';
 import { PackageStatusBadge } from './PackageStatusBadge';
@@ -42,6 +43,7 @@ export const packageColumns: ColumnDef<DopingPackage>[] = [
   {
     accessorKey: 'kind',
     header: 'Tür',
+    meta: { filter: packageKindFilter },
     cell: ({ getValue }) => <PackageKindBadge kind={getValue<DopingPackage['kind']>()} />,
   },
   {
@@ -57,6 +59,7 @@ export const packageColumns: ColumnDef<DopingPackage>[] = [
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: packageStatusFilter },
     cell: ({ getValue }) => <PackageStatusBadge status={getValue<DopingPackage['status']>()} />,
   },
   {

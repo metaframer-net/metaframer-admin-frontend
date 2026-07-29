@@ -53,17 +53,17 @@ export const FEATURE_FLAGS: FeatureFlagMeta[] = [
   {
     key: 'edgeDockBottom',
     label: 'Kenar dock — alt',
-    help: 'Dock yerleşiminde ekranın ALT kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Kapalıyken hiç gösterilmez.',
+    help: 'Dock yerleşiminde ekranın ALT kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Açıkken imleç yaklaştıkça ikonlar büyür ve üstündeki ikonun etrafında bir çember belirir. Kapalıyken hiç gösterilmez.',
   },
   {
     key: 'edgeDockLeft',
     label: 'Kenar dock — sol',
-    help: 'Dock yerleşiminde ekranın SOL kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Kapalıyken hiç gösterilmez.',
+    help: 'Dock yerleşiminde ekranın SOL kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Açıkken imleç yaklaştıkça ikonlar büyür ve üstündeki ikonun etrafında bir çember belirir. Kapalıyken hiç gösterilmez.',
   },
   {
     key: 'edgeDockRight',
     label: 'Kenar dock — sağ',
-    help: 'Dock yerleşiminde ekranın SAĞ kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Kapalıyken hiç gösterilmez.',
+    help: 'Dock yerleşiminde ekranın SAĞ kenarında, kenardan açılan hızlı gezinme dock’unu gösterir. Kapalı tutamak nabız atar; hover/klavye/dokunma ile açılır. Açıkken imleç yaklaştıkça ikonlar büyür ve üstündeki ikonun etrafında bir çember belirir. Kapalıyken hiç gösterilmez.',
   },
 ];
 

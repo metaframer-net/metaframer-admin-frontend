@@ -12,7 +12,7 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ArrowUp, ChevronsUpDown, GripVertical } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown, GripVertical } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/feedback/EmptyState';
@@ -28,6 +28,8 @@ import type { TableUrlState } from './use-table-url-state';
 
 const VIRTUAL_THRESHOLD = 30;
 const ROW_HEIGHT = 44;
+/** Id of the auto-injected expander column (see `expanderColumn`). */
+const EXPANDER_ID = '__expander';
 
 export interface DataTableProps<TData> {
   columns: ColumnDef<TData>[];
@@ -50,14 +52,37 @@ export interface DataTableProps<TData> {
   onExport?: (format: ExportFormat, scope: ExportScope, ctx: { pageRows: TData[]; selectedIds: string[] }) => void | Promise<void>;
   /** Arbitrary table meta forwarded to columns via `table.options.meta`. */
   meta?: unknown;
-  /**
-   * Enables column pinning (sticky left) + drag-reorder (DATA_TABLE_SPEC point 4).
-   * Opt-in per table so tables that don't need it keep their default behavior.
-   * A keyboard-accessible alternative (pin / move) lives in the Kolonlar menu.
-   */
-  columnControls?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+}
+
+/**
+ * Expand/collapse toggle, auto-injected as the first data column whenever a
+ * `renderSubRow` is supplied. Owning it here (instead of per-feature column
+ * files) is what keeps expandable rows — DATA_TABLE_SPEC point 6 — identical on
+ * every table in the app rather than an affordance each vertical re-invents.
+ */
+function expanderColumn<TData>(): ColumnDef<TData> {
+  return {
+    id: EXPANDER_ID,
+    enableSorting: false,
+    enableHiding: false,
+    size: 40,
+    header: () => <span className="sr-only">Detay</span>,
+    cell: ({ row }) => (
+      <button
+        type="button"
+        onClick={() => row.toggleExpanded()}
+        aria-expanded={row.getIsExpanded()}
+        aria-label={row.getIsExpanded() ? 'Detayı kapat' : 'Detayı aç'}
+        className="hover:bg-accent focus-visible:ring-ring relative inline-flex size-6 items-center justify-center rounded outline-none after:absolute after:-inset-2.5 after:content-[''] focus-visible:ring-2"
+        data-action="toggle-subrow"
+        data-entity="table"
+      >
+        <ChevronRight className={cn('size-4 transition-transform', row.getIsExpanded() && 'rotate-90')} />
+      </button>
+    ),
+  };
 }
 
 /** Sticky positioning + token styling for a pinned (left/right) column cell. */
@@ -99,7 +124,6 @@ export function DataTable<TData>({
   bulkActions,
   onExport,
   meta,
-  columnControls = false,
   emptyTitle = 'Kayıt bulunamadı',
   emptyDescription = 'Filtreleri değiştirin ya da yeni bir kayıt oluşturun.',
 }: DataTableProps<TData>) {
@@ -111,9 +135,19 @@ export function DataTable<TData>({
   const dragCol = React.useRef<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
+  /*
+   * The expander is injected right AFTER a leading `select` checkbox column so
+   * every table reads `[seç] [detay] …data… [işlem]` from left to right.
+   */
+  const tableColumns = React.useMemo(() => {
+    if (!renderSubRow) return columns;
+    const at = columns[0]?.id === 'select' ? 1 : 0;
+    return [...columns.slice(0, at), expanderColumn<TData>(), ...columns.slice(at)];
+  }, [columns, renderSubRow]);
+
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
     state: { sorting: state.sorting, rowSelection, columnVisibility, columnOrder, columnPinning },
     manualPagination: true,
     manualSorting: true,
@@ -123,7 +157,7 @@ export function DataTable<TData>({
     enableRowSelection: true,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
-    enableColumnPinning: columnControls,
+    enableColumnPinning: true,
     onSortingChange: state.setSorting,
     onRowSelectionChange: (updater) => {
       setRowSelection(updater);
@@ -190,13 +224,16 @@ export function DataTable<TData>({
               xl), so keep them off the tight phone toolbar where they'd be inert. */}
           <div className="hidden items-center gap-2 xl:flex">
             <DensityToggle />
-            <ColumnVisibility table={table} enableControls={columnControls} />
+            <ColumnVisibility table={table} />
           </div>
           {onExport && <ExportMenu selectedCount={selectedIds.length} onExport={handleExport} />}
         </div>
       </div>
 
-      {selectedIds.length > 0 && bulkActions && (
+      {/* Selection feedback is structural, not per-feature: the bar (count +
+          "select all matching" + clear) shows on ANY selection; `bulkActions`
+          only adds the domain-specific buttons on its right. */}
+      {selectedIds.length > 0 && (
         <BulkActionBar
           selectedCount={selectedIds.length}
           total={total}
@@ -204,7 +241,7 @@ export function DataTable<TData>({
           onSelectAllMatching={() => setAllMatching(true)}
           onClear={clearSelection}
         >
-          {bulkActions(selectedIds, allMatching, clearSelection)}
+          {bulkActions?.(selectedIds, allMatching, clearSelection)}
         </BulkActionBar>
       )}
 
@@ -229,7 +266,7 @@ export function DataTable<TData>({
                       const canSort = header.column.getCanSort();
                       const sorted = header.column.getIsSorted();
                       const pin = pinnedCellProps(header.column);
-                      const reorderable = columnControls && !header.isPlaceholder;
+                      const reorderable = !header.isPlaceholder;
                       return (
                         <th
                           key={header.id}
@@ -360,14 +397,19 @@ export function DataTable<TData>({
                     renderMobileCard(row.original, selected, toggle)
                   ) : (
                     <dl className="grid grid-cols-2 gap-1 text-sm">
-                      {row.getVisibleCells().map((cell) => (
-                        <div key={cell.id} className="col-span-2 flex justify-between gap-2">
-                          <dt className="text-muted-foreground">
-                            {typeof cell.column.columnDef.header === 'string' ? cell.column.columnDef.header : cell.column.id}
-                          </dt>
-                          <dd className="text-right">{flexRender(cell.column.columnDef.cell, cell.getContext())}</dd>
-                        </div>
-                      ))}
+                      {row
+                        .getVisibleCells()
+                        .filter((cell) => cell.column.id !== EXPANDER_ID)
+                        .map((cell) => (
+                          <div key={cell.id} className="col-span-2 flex justify-between gap-2">
+                            <dt className="text-muted-foreground">
+                              {typeof cell.column.columnDef.header === 'string'
+                                ? cell.column.columnDef.header
+                                : cell.column.id}
+                            </dt>
+                            <dd className="text-right">{flexRender(cell.column.columnDef.cell, cell.getContext())}</dd>
+                          </div>
+                        ))}
                     </dl>
                   )}
                 </div>

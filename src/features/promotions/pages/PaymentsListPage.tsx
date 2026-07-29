@@ -4,39 +4,16 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
-import {
-  PAYMENT_METHODS,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_STATUSES,
-  PAYMENT_STATUS_LABELS,
-} from '../data/promotions';
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from '../data/promotions';
+import { paymentFilters } from '../data/filters';
 import { paymentColumns } from '../components/paymentColumns';
 import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
 import { PaymentMethodBadge } from '../components/PaymentMethodBadge';
 import { usePayments } from '../api/queries';
 import { formatTry, type Payment } from '../schemas/promotion';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: PAYMENT_STATUSES.map((s) => ({ value: s, label: PAYMENT_STATUS_LABELS[s] })),
-  },
-  {
-    id: 'method',
-    label: 'Yöntem',
-    kind: 'faceted',
-    multiple: true,
-    options: PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] })),
-  },
-  { id: 'createdAt', label: 'Tarih', kind: 'dateRange' },
-];
 
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
@@ -80,7 +57,7 @@ export function PaymentsListPage() {
         filterBar={
           <FilterBar
             tableKey="payments"
-            filters={filters}
+            filters={paymentFilters}
             state={state}
             searchPlaceholder="Fatura no, kullanıcı veya paket ara…"
             onNaturalLanguage={parseNaturalLanguage}

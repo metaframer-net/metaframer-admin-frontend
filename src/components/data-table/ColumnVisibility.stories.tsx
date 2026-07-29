@@ -5,14 +5,14 @@ import { expect, userEvent, within } from 'storybook/test';
 import { ColumnVisibility } from './ColumnVisibility';
 import { demoColumns, DEMO_ROWS } from './story-fixtures';
 
-function Harness({ enableControls = false }: { enableControls?: boolean } = {}) {
+function Harness() {
   const table = useReactTable({
     data: DEMO_ROWS.slice(0, 3),
     columns: demoColumns,
     getCoreRowModel: getCoreRowModel(),
-    enableColumnPinning: enableControls,
+    enableColumnPinning: true,
   });
-  return <ColumnVisibility table={table} enableControls={enableControls} />;
+  return <ColumnVisibility table={table} />;
 }
 
 const meta = {
@@ -31,9 +31,8 @@ export const Default: Story = {
     await userEvent.keyboard('{Escape}');
   },
 };
-/** With `enableControls`: the menu exposes keyboard-accessible pin + move (per-column submenu). */
+/** The menu always exposes keyboard-accessible pin + move (per-column submenu). */
 export const WithControls: Story = {
-  render: () => <Harness enableControls />,
   play: async ({ canvas }) => {
     const body = within(document.body);
     await userEvent.click(canvas.getByRole('button', { name: /Kolonlar/ }));

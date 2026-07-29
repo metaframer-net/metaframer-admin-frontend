@@ -5,22 +5,18 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
 import { Can } from '@/lib/permissions/permission-context';
 import {
-  REASON_CATEGORIES,
   REASON_CATEGORY_LABELS,
-  REPORT_PRIORITIES,
   REPORT_PRIORITY_LABELS,
   REPORT_STATUS_LABELS,
-  REPORT_STATUSES,
   REPORT_SUBJECT_TYPE_LABELS,
-  REPORT_SUBJECT_TYPES,
 } from '../data/reports';
+import { reportFilters } from '../data/filters';
 import { reportColumns } from '../components/reportColumns';
 import { ReportStatusBadge } from '../components/ReportStatusBadge';
 import { ReportPriorityBadge } from '../components/ReportPriorityBadge';
@@ -28,37 +24,6 @@ import { ReasonCategoryBadge } from '../components/ReasonCategoryBadge';
 import { ReportActionDialog } from '../components/ReportActionDialog';
 import { useReports, reportKeys } from '../api/queries';
 import type { Report, ReportActionInput } from '../schemas/report';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: REPORT_STATUSES.map((s) => ({ value: s, label: REPORT_STATUS_LABELS[s] })),
-  },
-  {
-    id: 'subjectType',
-    label: 'Tür',
-    kind: 'faceted',
-    multiple: true,
-    options: REPORT_SUBJECT_TYPES.map((t) => ({ value: t, label: REPORT_SUBJECT_TYPE_LABELS[t] })),
-  },
-  {
-    id: 'reasonCategory',
-    label: 'Sebep',
-    kind: 'faceted',
-    multiple: true,
-    options: REASON_CATEGORIES.map((r) => ({ value: r, label: REASON_CATEGORY_LABELS[r] })),
-  },
-  {
-    id: 'priority',
-    label: 'Öncelik',
-    kind: 'faceted',
-    multiple: true,
-    options: REPORT_PRIORITIES.map((p) => ({ value: p, label: REPORT_PRIORITY_LABELS[p] })),
-  },
-];
 
 /** Parse simple Turkish free text into proposed report filters. */
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
@@ -106,7 +71,7 @@ export function ReportsListPage() {
         filterBar={
           <FilterBar
             tableKey="reports"
-            filters={filters}
+            filters={reportFilters}
             state={state}
             searchPlaceholder="Konu, açıklama veya şikayet eden ara…"
             onNaturalLanguage={parseNaturalLanguage}

@@ -86,8 +86,12 @@ export const SelectsRowsAndShowsBulkBar: Story = {
   },
 };
 
+/**
+ * Column controls (drag-reorder + pin + resize) are NOT opt-in — every table in
+ * the app gets them, so this story asserts the default demo already has them.
+ */
 export const ColumnControls: Story = {
-  render: () => <DataTableDemo columnControls />,
+  render: () => <DataTableDemo />,
   play: async ({ canvas }) => {
     // Drag handles are present on reorderable headers (mouse affordance)…
     await expect(canvas.getAllByRole('button', { name: 'Kolonu taşımak için sürükle' }).length).toBeGreaterThan(0);
@@ -106,6 +110,29 @@ export const ColumnControls: Story = {
         .some((th) => (th as HTMLElement).style.position === 'sticky');
       expect(sticky).toBe(true);
     });
+  },
+};
+
+/** The expander column is injected by the DataTable itself when `renderSubRow` is set. */
+export const ExpandsSubRow: Story = {
+  render: () => <DataTableDemo />,
+  play: async ({ canvas }) => {
+    const toggles = canvas.getAllByRole('button', { name: 'Detayı aç' });
+    await userEvent.click(toggles[0]!);
+    await expect(await canvas.findByText(/Detay:/)).toBeInTheDocument();
+  },
+};
+
+/**
+ * A table with no domain bulk actions still shows the selection bar (count,
+ * "select all matching", clear) — selection feedback is structural.
+ */
+export const SelectionBarWithoutBulkActions: Story = {
+  render: () => <StateHarness />,
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getAllByRole('checkbox', { name: /satırını seç/ })[0]!);
+    const bar = await canvas.findByRole('region', { name: 'Toplu işlemler' });
+    await expect(within(bar).getByText('1 seçili')).toBeInTheDocument();
   },
 };
 

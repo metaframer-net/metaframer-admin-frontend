@@ -117,8 +117,9 @@ Measured, token-based transparency/blur in OUR palette (task 021) — NOT the re
 - Usage: `bg-glass text-glass-foreground border-glass-border` + a `backdrop-blur-*` utility. Light AND dark are contrast-verified. Hardcoded color/opacity hacks are forbidden — the glass effect is entirely token + `backdrop-blur`.
 
 ## Motion tokens
-- Durations: `fast 120ms`, `base 180ms`, `slow 260ms`.
-- Easings: `standard cubic-bezier(0.2,0,0,1)`, `emphasized cubic-bezier(0.2,0,0,1)`, `exit cubic-bezier(0.4,0,1,1)`.
+- Durations: `fast 120ms`, `base 180ms`, `slow 260ms`, `reveal 420ms`.
+- Easings: `standard cubic-bezier(0.2,0,0,1)`, `emphasized cubic-bezier(0.2,0,0,1)`, `exit cubic-bezier(0.4,0,1,1)`, `spring cubic-bezier(0.34,1.15,0.5,1)`.
+- `reveal` + `spring` are a matched pair, reserved for a surface flying in from OFF-SCREEN (today: the edge-dock stage). The overshoot needs the long travel to read as arrival rather than a wobble, and it applies to `transform` only — opacity on the same element stays on `base` + `standard`, so the surface is legible for the whole flight. In-page state changes keep using fast/base/slow.
 - Respect `prefers-reduced-motion`: disable non-essential motion.
 
 ## Breakpoints

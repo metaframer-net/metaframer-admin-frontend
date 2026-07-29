@@ -4,40 +4,16 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { AuditEntry } from '@/lib/audit';
 import type { Paginated } from '@/lib/api/types';
-import {
-  ACTION_FAMILIES,
-  ACTION_FAMILY_LABELS,
-  ACTOR_KINDS,
-  ACTOR_KIND_LABELS,
-} from '../data/audit';
+import { auditFilters } from '../data/filters';
 import { auditColumns } from '../components/auditColumns';
 import { AuditActorBadge } from '../components/AuditActorBadge';
 import { AuditTimeline } from '../components/AuditTimeline';
 import { useAuditLog } from '../api/queries';
 import { auditReason } from '../lib/audit-utils';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'family',
-    label: 'İşlem türü',
-    kind: 'faceted',
-    multiple: true,
-    options: ACTION_FAMILIES.map((f) => ({ value: f, label: ACTION_FAMILY_LABELS[f] })),
-  },
-  {
-    id: 'actorKind',
-    label: 'Aktör',
-    kind: 'faceted',
-    multiple: true,
-    options: ACTOR_KINDS.map((k) => ({ value: k, label: ACTOR_KIND_LABELS[k] })),
-  },
-  { id: 'ts', label: 'Tarih', kind: 'dateRange' },
-];
 
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
@@ -90,7 +66,7 @@ export function AuditListPage() {
         filterBar={
           <FilterBar
             tableKey="audit"
-            filters={filters}
+            filters={auditFilters}
             state={state}
             searchPlaceholder="Kaynak, işlem, aktör veya gerekçe ara…"
             onNaturalLanguage={parseNaturalLanguage}

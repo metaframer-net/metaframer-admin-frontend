@@ -5,20 +5,13 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig } from '@/components/data-table/types';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
 import { Can } from '@/lib/permissions/permission-context';
-import { ilOptions, LOCATIONS } from '@/features/listings/data/taxonomy';
-import {
-  USER_STATUSES,
-  USER_STATUS_LABELS,
-  USER_TYPES,
-  USER_TYPE_LABELS,
-  VERIFICATION_LABELS,
-  VERIFICATION_LEVELS,
-} from '../data/users';
+import { LOCATIONS } from '@/features/listings/data/taxonomy';
+import { USER_STATUS_LABELS, USER_TYPE_LABELS } from '../data/users';
+import { userFilters } from '../data/filters';
 import { userColumns } from '../components/userColumns';
 import { UserStatusBadge } from '../components/UserStatusBadge';
 import { TrustScoreMeter } from '../components/TrustScoreMeter';
@@ -26,38 +19,6 @@ import { VerificationBadges } from '../components/VerificationBadges';
 import { UserActionDialog } from '../components/UserActionDialog';
 import { useUsers, userKeys } from '../api/queries';
 import type { User, UserActionInput } from '../schemas/user';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: USER_STATUSES.map((s) => ({ value: s, label: USER_STATUS_LABELS[s] })),
-  },
-  {
-    id: 'type',
-    label: 'Tip',
-    kind: 'faceted',
-    multiple: true,
-    options: USER_TYPES.map((t) => ({ value: t, label: USER_TYPE_LABELS[t] })),
-  },
-  {
-    id: 'verification',
-    label: 'Kimlik doğrulama',
-    kind: 'faceted',
-    multiple: true,
-    options: VERIFICATION_LEVELS.map((v) => ({ value: v, label: VERIFICATION_LABELS[v] })),
-  },
-  { id: 'trust', label: 'Güven skoru', kind: 'numberRange' },
-  {
-    id: 'il',
-    label: 'Şehir',
-    kind: 'faceted',
-    multiple: false,
-    options: ilOptions(),
-  },
-];
 
 /** Parse simple Turkish free text into proposed user filters. */
 function parseNaturalLanguage(text: string): Record<string, string | string[]> {
@@ -100,7 +61,7 @@ export function UsersListPage() {
         filterBar={
           <FilterBar
             tableKey="users"
-            filters={filters}
+            filters={userFilters}
             state={state}
             searchPlaceholder="Ad veya e-posta ara…"
             onNaturalLanguage={parseNaturalLanguage}

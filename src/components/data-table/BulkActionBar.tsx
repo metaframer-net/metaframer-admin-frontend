@@ -10,7 +10,8 @@ export interface BulkActionBarProps {
   allMatchingSelected?: boolean;
   onSelectAllMatching?: () => void;
   onClear: () => void;
-  children: ReactNode;
+  /** Domain-specific bulk actions; omitted when a table has none. */
+  children?: ReactNode;
 }
 
 /** Contextual bar shown while rows are selected; hosts bulk actions. */

@@ -4,47 +4,19 @@ import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
-import type { FilterConfig, TableQuery } from '@/components/data-table/types';
+import type { TableQuery } from '@/components/data-table/types';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
-import { ilOptions, LOCATIONS } from '@/features/listings/data/taxonomy';
-import {
-  USER_STATUSES,
-  USER_STATUS_LABELS,
-  VERIFICATION_LABELS,
-  VERIFICATION_LEVELS,
-} from '../data/users';
+import { LOCATIONS } from '@/features/listings/data/taxonomy';
+import { USER_STATUS_LABELS } from '../data/users';
+import { officeFilters } from '../data/filters';
 import { officeColumns } from '../components/officeColumns';
 import { UserStatusBadge } from '../components/UserStatusBadge';
 import { TrustScoreMeter } from '../components/TrustScoreMeter';
 import { VerificationBadges } from '../components/VerificationBadges';
 import { useUsers } from '../api/queries';
 import type { User } from '../schemas/user';
-
-const filters: FilterConfig[] = [
-  {
-    id: 'status',
-    label: 'Durum',
-    kind: 'faceted',
-    multiple: true,
-    options: USER_STATUSES.map((s) => ({ value: s, label: USER_STATUS_LABELS[s] })),
-  },
-  {
-    id: 'verification',
-    label: 'Ofis belgesi',
-    kind: 'faceted',
-    multiple: true,
-    options: VERIFICATION_LEVELS.map((v) => ({ value: v, label: VERIFICATION_LABELS[v] })),
-  },
-  {
-    id: 'il',
-    label: 'Şehir',
-    kind: 'faceted',
-    multiple: false,
-    options: ilOptions(),
-  },
-];
 
 /** Lock the query to offices regardless of URL state. */
 function withOfficeType(query: TableQuery): TableQuery {
@@ -73,7 +45,7 @@ export function OfficesListPage() {
         isError={isError}
         onRetry={() => void refetch()}
         filterBar={
-          <FilterBar tableKey="offices" filters={filters} state={state} searchPlaceholder="Ofis unvanı ara…" />
+          <FilterBar tableKey="offices" filters={officeFilters} state={state} searchPlaceholder="Ofis unvanı ara…" />
         }
         renderSubRow={(row) => (
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">

@@ -16,18 +16,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /**
- * Column visibility picker driven by the TanStack Table instance. When
- * `enableControls` is set (table `columnControls`), each column also exposes a
- * keyboard-accessible submenu to pin (sticky-left) or move it left/right — the
- * accessible alternative to header drag-reorder (DATA_TABLE_SPEC point 4).
+ * Column visibility picker driven by the TanStack Table instance. Each column
+ * also exposes a keyboard-accessible submenu to pin (sticky-left) or move it
+ * left/right — the accessible alternative to header drag-reorder
+ * (DATA_TABLE_SPEC point 4). Both are unconditional: every table in the app
+ * offers the same column controls.
  */
-export function ColumnVisibility<TData>({
-  table,
-  enableControls = false,
-}: {
-  table: Table<TData>;
-  enableControls?: boolean;
-}) {
+export function ColumnVisibility<TData>({ table }: { table: Table<TData> }) {
   const columns = table.getAllColumns().filter((c) => c.getCanHide());
 
   const move = (id: string, dir: -1 | 1) => {
@@ -63,56 +58,52 @@ export function ColumnVisibility<TData>({
           </DropdownMenuCheckboxItem>
         ))}
 
-        {enableControls && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Kolon düzeni</DropdownMenuLabel>
-            {columns.map((column) => {
-              const label = typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id;
-              const pinned = column.getIsPinned() === 'left';
-              return (
-                <DropdownMenuSub key={column.id}>
-                  <DropdownMenuSubTrigger>{label}</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        column.pin(pinned ? false : 'left');
-                      }}
-                      data-action={pinned ? 'unpin-column' : 'pin-column'}
-                      data-entity="table"
-                    >
-                      {pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-                      {pinned ? 'Sabiti kaldır' : 'Sola sabitle'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        move(column.id, -1);
-                      }}
-                      data-action="move-column-left"
-                      data-entity="table"
-                    >
-                      <ArrowLeftToLine className="size-4" />
-                      Sola taşı
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        move(column.id, 1);
-                      }}
-                      data-action="move-column-right"
-                      data-entity="table"
-                    >
-                      <ArrowRightToLine className="size-4" />
-                      Sağa taşı
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              );
-            })}
-          </>
-        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Kolon düzeni</DropdownMenuLabel>
+        {columns.map((column) => {
+          const label = typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id;
+          const pinned = column.getIsPinned() === 'left';
+          return (
+            <DropdownMenuSub key={column.id}>
+              <DropdownMenuSubTrigger>{label}</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    column.pin(pinned ? false : 'left');
+                  }}
+                  data-action={pinned ? 'unpin-column' : 'pin-column'}
+                  data-entity="table"
+                >
+                  {pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+                  {pinned ? 'Sabiti kaldır' : 'Sola sabitle'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    move(column.id, -1);
+                  }}
+                  data-action="move-column-left"
+                  data-entity="table"
+                >
+                  <ArrowLeftToLine className="size-4" />
+                  Sola taşı
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    move(column.id, 1);
+                  }}
+                  data-action="move-column-right"
+                  data-entity="table"
+                >
+                  <ArrowRightToLine className="size-4" />
+                  Sağa taşı
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

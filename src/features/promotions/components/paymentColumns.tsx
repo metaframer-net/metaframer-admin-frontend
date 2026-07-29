@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { paymentDateFilter, paymentMethodFilter, paymentStatusFilter } from '../data/filters';
 import { formatTry, type Payment } from '../schemas/promotion';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
 import { PaymentMethodBadge } from './PaymentMethodBadge';
@@ -58,16 +59,19 @@ export const paymentColumns: ColumnDef<Payment>[] = [
   {
     accessorKey: 'method',
     header: 'Yöntem',
+    meta: { filter: paymentMethodFilter },
     cell: ({ getValue }) => <PaymentMethodBadge method={getValue<Payment['method']>()} />,
   },
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: paymentStatusFilter },
     cell: ({ getValue }) => <PaymentStatusBadge status={getValue<Payment['status']>()} />,
   },
   {
     accessorKey: 'createdAt',
     header: 'Tarih',
+    meta: { filter: paymentDateFilter },
     cell: ({ getValue }) => (
       <span className="tabular-nums">{new Date(getValue<string>()).toLocaleDateString('tr-TR')}</span>
     ),

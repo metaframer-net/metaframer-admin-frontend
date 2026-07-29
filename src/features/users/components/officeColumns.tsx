@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { LOCATIONS } from '@/features/listings/data/taxonomy';
+import { ilFilter, officeDocumentFilter, statusFilter, trustFilter } from '../data/filters';
 import type { User } from '../schemas/user';
 import { UserStatusBadge } from './UserStatusBadge';
 import { TrustScoreMeter } from './TrustScoreMeter';
@@ -49,11 +50,13 @@ export const officeColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => <UserStatusBadge status={getValue<User['status']>()} />,
   },
   {
     accessorKey: 'trustScore',
     header: 'Güven',
+    meta: { filter: trustFilter },
     cell: ({ getValue }) => (
       <div className="w-32">
         <TrustScoreMeter score={getValue<number>()} compact />
@@ -64,6 +67,7 @@ export const officeColumns: ColumnDef<User>[] = [
     id: 'verification',
     header: 'Doğrulama',
     enableSorting: false,
+    meta: { filter: officeDocumentFilter },
     cell: ({ row }) => <VerificationBadges verification={row.original.verification} hideNone />,
   },
   {
@@ -75,6 +79,7 @@ export const officeColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'il',
     header: 'Şehir',
+    meta: { filter: ilFilter },
     cell: ({ getValue }) => LOCATIONS[getValue<string>()]?.label ?? getValue<string>(),
   },
   {

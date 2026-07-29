@@ -113,7 +113,6 @@ export function ListingsListPage() {
           total={data?.total ?? 0}
           state={state}
           getRowId={(r) => r.id}
-          columnControls
           meta={tableMeta}
           isLoading={isLoading}
           isError={isError}

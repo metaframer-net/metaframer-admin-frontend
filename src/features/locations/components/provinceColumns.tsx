@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { statusFilter } from '../data/filters';
 import type { Province } from '../schemas/location';
 import { LocationStatusBadge } from './LocationStatusBadge';
 
@@ -104,6 +105,7 @@ export const provinceColumns: ColumnDef<Province>[] = [
   {
     accessorKey: 'status',
     header: 'Durum',
+    meta: { filter: statusFilter },
     cell: ({ getValue }) => <LocationStatusBadge status={getValue<Province['status']>()} />,
   },
   {
