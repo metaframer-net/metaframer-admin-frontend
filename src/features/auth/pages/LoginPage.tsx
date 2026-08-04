@@ -1,5 +1,6 @@
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 
+import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/auth-context';
 import { AuthShell } from '../components/AuthShell';
 import { LoginForm } from '../components/LoginForm';
@@ -45,9 +46,19 @@ export function LoginPage() {
                 navigate('/login/2fa', {
                   state: { challengeToken: res.challengeToken, returnTo },
                 });
+              } else if (res.requires2faSetup && res.setupToken) {
+                navigate('/login/2fa/setup', {
+                  state: { setupToken: res.setupToken, returnTo },
+                });
               } else if (res.token && res.user) {
                 setSession(res.token, res.user);
                 navigate(returnTo, { replace: true });
+              }
+            },
+            onError: (err) => {
+              // A suspended account (403) gets its own page instead of an inline error.
+              if (err instanceof ApiError && (err.body as { code?: string })?.code === 'account_disabled') {
+                navigate('/account/disabled', { replace: true });
               }
             },
           })

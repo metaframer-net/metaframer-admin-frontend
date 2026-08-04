@@ -38,10 +38,16 @@ function renderWith(seed: (qc: QueryClient) => void) {
   );
 }
 
-const info = (totpEnabled: boolean): SecurityInfo => ({ totpEnabled, sessions: SESSIONS });
+const info = (totpEnabled: boolean, totpRequired = false): SecurityInfo => ({
+  totpEnabled,
+  totpRequired,
+  recoveryCodesRemaining: totpEnabled ? 8 : 0,
+  sessions: SESSIONS,
+});
 
 export const Default: Story = { render: () => renderWith((qc) => qc.setQueryData(securityKeys.info, info(true))) };
 export const TwoFactorOff: Story = { render: () => renderWith((qc) => qc.setQueryData(securityKeys.info, info(false))) };
+export const TwoFactorRequired: Story = { render: () => renderWith((qc) => qc.setQueryData(securityKeys.info, info(true, true))) };
 export const Loading: Story = { render: () => renderWith((qc) => seedQueryLoading(qc, securityKeys.info)) };
 export const Error: Story = { render: () => renderWith((qc) => seedQueryError(qc, securityKeys.info)) };
 export const Mobile: Story = {

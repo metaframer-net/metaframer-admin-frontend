@@ -1,5 +1,24 @@
 # Current Task
--> (none) — **Auth arc COMPLETE** (Tasks 032 → 034 all done). Marathon; kullanıcının faz-faz commit'ini bekliyor.
+-> (none) — **Auth COMPLETE** (arc 032 → 034 + completeness arc 035 → 037 all done). Kullanıcının faz-faz commit'ini bekliyor.
+
+## Auth completeness arc (035 → 037) — DONE (marathon, mevcut tasarımda; UI redesign sona bırakıldı)
+- **035** — 2FA politika-tabanlı (opt-in + ayrıcalıklı rol zorunlu; süper-admin hardcode kaldırıldı; login'de zorunlu
+  enrollment; kurtarma kodları; Settings → Güvenlik sekmesinden politika düzenlenir).
+- **036** — Auth status/hata sayfaları: `/session-expired` (401-expiry AuthGate'ten yönlenir) · `/account/disabled`
+  (askıya alınmış admin; login 403 → yönlenir) · `/unauthorized` (standalone 403) · `/auth/error`.
+- **037** — Organizasyon/tenant: model + seed · `GET/POST /auth/organizations[/active]` · **OrgSwitcher** (Topbar,
+  tek-org'da gizli) · `/select-organization` (AuthGate'li shell'siz picker). SSO YOK (karar).
+- **Kapsam-dışı (bilerek):** `/register`, magic-link, `/login/password`, `/onboarding`, `/verify-email-change`, SSO.
+- UI redesign: `docs/mockups/design-directions.html` (D1–D4) — sona bırakıldı.
+- Nihai doğrulama (oturmuş ağaç): typecheck/lint(0 hata)/build/build-storybook yeşil · **`npm run test` 1214/1214**.
+- ⚠️ Paralel bir oturum aynı ağaçta dashboard/sidebar/CRM işi yaptı; auth dosyalarını **açık `git add` listeleriyle**
+  ayrı commit'le (final rapordaki listeler). Detay checkpoint'ler: `docs/tasks/PROGRESS.md`.
+
+Mode: TASK. Sıradaki: kullanıcının faz-faz manuel commit'leri (mesajlar hazır) → sonra UI redesign veya yeni hedef.
+
+---
+
+## Archived: Auth arc COMPLETE (Tasks 032 → 034 all done). Marathon; kullanıcının faz-faz commit'ini bekliyor.
 
 Teslim edilen (hepsi MSW-simüle, FastAPI'ye tak-çalıştır): Login (Variant A) · oturum boot/kalıcılık (`GET /auth/me`) ·
 `AuthGate` (RBAC guard'dan önce) · çıkış · `client.ts` Bearer + merkezî 401 · şifre kurtarma (forgot/reset) · admin

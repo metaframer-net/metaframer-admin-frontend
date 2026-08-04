@@ -3,19 +3,25 @@ import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/api/client';
 import { writeAudit } from '@/lib/audit';
+import type { Role } from '@/lib/permissions/permissions';
 import type { SessionUser } from '@/lib/auth/auth-context';
 import {
   SEED_ADMINS,
   SEED_INVITES,
+  SEED_ORGS,
+  DEFAULT_ORG_ID,
   toSessionUser,
   DEMO_TOTP_CODE,
+  TWO_FACTOR_REQUIRED_ROLES,
   type SeedAdmin,
 } from '../data/auth';
 import {
   loginSchema,
   forgotPasswordSchema,
+  twoFactorPolicySchema,
   type ActiveSession,
   type LoginResponse,
+  type OrganizationsResponse,
   type SecurityInfo,
   type TwoFactorSetup,
 } from '../schemas/auth';
@@ -27,12 +33,16 @@ import {
 let sessions = new Map<string, string>(); // session token -> user id
 let revokedTokens = new Set<string>(); // tokens invalidated by logout/refresh
 let challenges = new Map<string, string>(); // 2FA challenge token -> user id
+let setupChallenges = new Map<string, string>(); // mandatory-2FA setup token -> user id
 let resetTokens = new Map<string, string>(); // reset token -> email
 let passwordOverrides = new Map<string, string>(); // email(lower) -> new password
 let consumedInvites = new Set<string>(); // invite tokens already accepted
 let extraAdmins: SeedAdmin[] = []; // admins created via accept-invite
-let twoFactorOverrides = new Map<string, boolean>(); // user id -> 2FA enabled override
+let twoFactorOverrides = new Map<string, boolean>(); // user id -> 2FA enrolled override
+let recoveryCodes = new Map<string, Array<{ code: string; used: boolean }>>(); // user id -> codes
+let twoFactorRequiredRoles = new Set<Role>(TWO_FACTOR_REQUIRED_ROLES); // policy
 let otherSessions = new Map<string, ActiveSession[]>(); // user id -> other devices
+let activeOrgByUser = new Map<string, string>(); // user id -> active org id
 let seq = 0;
 
 /** Reset the whole mock auth backend (tests). */
@@ -40,14 +50,21 @@ export function resetAuthDb(): void {
   sessions = new Map();
   revokedTokens = new Set();
   challenges = new Map();
+  setupChallenges = new Map();
   resetTokens = new Map();
   passwordOverrides = new Map();
   consumedInvites = new Set();
   extraAdmins = [];
   twoFactorOverrides = new Map();
+  recoveryCodes = new Map();
+  twoFactorRequiredRoles = new Set(TWO_FACTOR_REQUIRED_ROLES);
   otherSessions = new Map();
+  activeOrgByUser = new Map();
   seq = 0;
 }
+
+/** Org ids an admin belongs to (defaults to the main org). */
+const orgIdsForAdmin = (admin: SeedAdmin) => admin.orgs ?? [DEFAULT_ORG_ID];
 
 /** Static mock 2FA enrollment secret (no real TOTP). */
 const DEMO_TOTP_SETUP: TwoFactorSetup = {
@@ -55,11 +72,43 @@ const DEMO_TOTP_SETUP: TwoFactorSetup = {
   otpauth: 'otpauth://totp/arsam.net?secret=ARSAMDEMOSECRET234&issuer=arsam.net',
 };
 
-/** Effective 2FA state: a runtime override wins over the seed flag. */
-function twoFaEnabled(userId: string): boolean {
+const nextId = () => (seq += 1);
+const allAdmins = (): SeedAdmin[] => [...SEED_ADMINS, ...extraAdmins];
+const findByEmail = (email: string) =>
+  allAdmins().find((a) => a.email.toLowerCase() === email.toLowerCase());
+const findById = (id: string) => allAdmins().find((a) => a.id === id);
+const effectivePassword = (admin: SeedAdmin) =>
+  passwordOverrides.get(admin.email.toLowerCase()) ?? admin.password;
+
+/** Effective 2FA enrollment: a runtime override wins over the seed flag. */
+function twoFaEnrolled(userId: string): boolean {
   const override = twoFactorOverrides.get(userId);
   if (override !== undefined) return override;
   return findById(userId)?.totpEnabled ?? false;
+}
+
+/** Whether a role is required by policy to use 2FA. */
+const roleRequires2fa = (role: Role) => twoFactorRequiredRoles.has(role);
+
+/** Generate + store 10 one-time recovery codes for a user; returns the plain codes. */
+function genRecoveryCodes(userId: string): string[] {
+  const seg = () => (nextId() * 1103 + 937).toString(36).toUpperCase().padStart(4, '0').slice(-4);
+  const codes = Array.from({ length: 10 }, () => `${seg()}-${seg()}`);
+  recoveryCodes.set(userId, codes.map((code) => ({ code, used: false })));
+  return codes;
+}
+
+function recoveryRemaining(userId: string): number {
+  return (recoveryCodes.get(userId) ?? []).filter((c) => !c.used).length;
+}
+
+/** Consume an unused recovery code (used as a 2FA fallback). */
+function consumeRecovery(userId: string, code: string): boolean {
+  const list = recoveryCodes.get(userId);
+  const entry = list?.find((c) => !c.used && c.code === code.trim().toUpperCase());
+  if (!entry) return false;
+  entry.used = true;
+  return true;
 }
 
 /** Lazily seed a user's "other devices" list so the sessions view is populated. */
@@ -80,14 +129,6 @@ function sessionsFor(userId: string): ActiveSession[] {
   return [current, ...(otherSessions.get(userId) ?? [])];
 }
 
-const nextId = () => (seq += 1);
-const allAdmins = (): SeedAdmin[] => [...SEED_ADMINS, ...extraAdmins];
-const findByEmail = (email: string) =>
-  allAdmins().find((a) => a.email.toLowerCase() === email.toLowerCase());
-const findById = (id: string) => allAdmins().find((a) => a.id === id);
-const effectivePassword = (admin: SeedAdmin) =>
-  passwordOverrides.get(admin.email.toLowerCase()) ?? admin.password;
-
 function mintSession(userId: string): string {
   const token = `mock-${userId}-${nextId()}`;
   sessions.set(token, userId);
@@ -97,9 +138,7 @@ function mintSession(userId: string): string {
 /**
  * Resolve a token to a user id. Prefers the live session map, but falls back to
  * parsing the id out of the opaque `mock-<userId>-<seq>` token so a session
- * SURVIVES A PAGE RELOAD (the in-memory map resets, but a real backend would
- * still honour the token). Explicitly revoked tokens (logout/refresh) never
- * resolve. Runtime (invite-created) admins are not parseable across reloads.
+ * SURVIVES A PAGE RELOAD. Explicitly revoked tokens never resolve.
  */
 function userIdForToken(token: string | null): string | null {
   if (!token || revokedTokens.has(token)) return null;
@@ -128,12 +167,19 @@ function adminForRequest(request: Request): SeedAdmin | null {
   return userId ? findById(userId) ?? null : null;
 }
 
+function issueSession(admin: SeedAdmin): LoginResponse {
+  const token = mintSession(admin.id);
+  writeAudit({ actor: `user:${admin.id}`, action: 'auth.login', resource: `user:${admin.id}` });
+  return { token, user: toSessionUser(admin) };
+}
+
 const resetRequestSchema = z.object({ token: z.string().min(1), password: z.string().min(8) });
 const acceptInviteRequestSchema = z.object({ token: z.string().min(1), password: z.string().min(8) });
 const verify2faRequestSchema = z.object({ challengeToken: z.string().min(1), code: z.string().min(1) });
+const setupCompleteSchema = z.object({ setupToken: z.string().min(1), code: z.string().min(1) });
 
 export const authHandlers = [
-  // --- Sign in (+ 2FA challenge branch) -----------------------------------
+  // --- Sign in (+ 2FA challenge / mandatory-setup branches) ---------------
   http.post(`${API_BASE_URL}/auth/login`, async ({ request }) => {
     const parsed = loginSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -145,39 +191,67 @@ export const authHandlers = [
       writeAudit({ actor: `user:${email}`, action: 'auth.login_failed', resource: `user:${email}` });
       return HttpResponse.json({ message: 'E-posta veya şifre hatalı.' }, { status: 401 });
     }
-    // 2FA-enabled accounts get a challenge, not a session, until the code is verified.
-    if (twoFaEnabled(admin.id)) {
+    // Suspended account → blocked even with valid credentials.
+    if (admin.disabled) {
+      writeAudit({ actor: `user:${admin.id}`, action: 'auth.login_blocked_disabled', resource: `user:${admin.id}` });
+      return HttpResponse.json({ message: 'Hesabınız askıya alınmış.', code: 'account_disabled' }, { status: 403 });
+    }
+    // Enrolled → challenge for a code.
+    if (twoFaEnrolled(admin.id)) {
       const challengeToken = `chal-${admin.id}-${nextId()}`;
       challenges.set(challengeToken, admin.id);
       writeAudit({ actor: `user:${admin.id}`, action: 'auth.2fa_required', resource: `user:${admin.id}` });
       const body: LoginResponse = { requires2fa: true, challengeToken };
       return HttpResponse.json(body);
     }
-    const user = toSessionUser(admin);
-    const token = mintSession(admin.id);
-    writeAudit({ actor: `user:${admin.id}`, action: 'auth.login', resource: `user:${admin.id}` });
-    const body: LoginResponse = { token, user };
-    return HttpResponse.json(body);
+    // Not enrolled but policy REQUIRES it for this role → mandatory enrollment.
+    if (roleRequires2fa(admin.role)) {
+      const setupToken = `setup-${admin.id}-${nextId()}`;
+      setupChallenges.set(setupToken, admin.id);
+      writeAudit({ actor: `user:${admin.id}`, action: 'auth.2fa_setup_required', resource: `user:${admin.id}` });
+      const body: LoginResponse = { requires2faSetup: true, setupToken };
+      return HttpResponse.json(body);
+    }
+    // No 2FA → straight session.
+    return HttpResponse.json(issueSession(admin));
   }),
 
-  // --- Verify the 2FA code ------------------------------------------------
+  // --- Verify the 2FA code (TOTP code OR a recovery code) -----------------
   http.post(`${API_BASE_URL}/auth/2fa/verify`, async ({ request }) => {
     const parsed = verify2faRequestSchema.safeParse(await request.json());
     if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
     const { challengeToken, code } = parsed.data;
     const userId = challenges.get(challengeToken);
     if (!userId) return HttpResponse.json({ message: 'Doğrulama oturumu geçersiz veya süresi dolmuş.' }, { status: 401 });
-    if (code !== DEMO_TOTP_CODE) {
+    const ok = code === DEMO_TOTP_CODE || consumeRecovery(userId, code);
+    if (!ok) {
       writeAudit({ actor: `user:${userId}`, action: 'auth.2fa_failed', resource: `user:${userId}` });
       return HttpResponse.json({ message: 'Doğrulama kodu hatalı.' }, { status: 401 });
     }
     const admin = findById(userId);
     if (!admin) return HttpResponse.json({ message: 'Kullanıcı bulunamadı.' }, { status: 401 });
     challenges.delete(challengeToken);
-    const token = mintSession(admin.id);
-    writeAudit({ actor: `user:${admin.id}`, action: 'auth.login', resource: `user:${admin.id}` });
-    const body: LoginResponse = { token, user: toSessionUser(admin) };
-    return HttpResponse.json(body);
+    return HttpResponse.json(issueSession(admin));
+  }),
+
+  // --- Mandatory 2FA enrollment at login (no session yet) -----------------
+  http.post(`${API_BASE_URL}/auth/2fa/setup-complete`, async ({ request }) => {
+    const parsed = setupCompleteSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
+    const { setupToken, code } = parsed.data;
+    const userId = setupChallenges.get(setupToken);
+    if (!userId) return HttpResponse.json({ message: 'Kurulum oturumu geçersiz.' }, { status: 401 });
+    if (code !== DEMO_TOTP_CODE) {
+      return HttpResponse.json({ message: 'Doğrulama kodu hatalı.' }, { status: 401 });
+    }
+    const admin = findById(userId);
+    if (!admin) return HttpResponse.json({ message: 'Kullanıcı bulunamadı.' }, { status: 401 });
+    twoFactorOverrides.set(userId, true);
+    setupChallenges.delete(setupToken);
+    const codes = genRecoveryCodes(userId);
+    writeAudit({ actor: `user:${userId}`, action: 'auth.2fa_enabled', resource: `user:${userId}` });
+    const session = issueSession(admin);
+    return HttpResponse.json({ ...session, recoveryCodes: codes });
   }),
 
   // --- Current user -------------------------------------------------------
@@ -205,9 +279,6 @@ export const authHandlers = [
     if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
     const { email } = parsed.data;
     const admin = findByEmail(email);
-    // Never reveal whether the email exists (no account enumeration). A real
-    // token is minted only for a real account; the demo surfaces it in the UI
-    // in place of an actual email.
     let resetToken: string | undefined;
     if (admin) {
       resetToken = `reset-${nextId()}`;
@@ -224,10 +295,7 @@ export const authHandlers = [
     const { token, password } = parsed.data;
     const email = resetTokens.get(token);
     if (!email) {
-      return HttpResponse.json(
-        { message: 'Sıfırlama bağlantısı geçersiz veya süresi dolmuş.' },
-        { status: 422 },
-      );
+      return HttpResponse.json({ message: 'Sıfırlama bağlantısı geçersiz veya süresi dolmuş.' }, { status: 422 });
     }
     passwordOverrides.set(email, password);
     resetTokens.delete(token);
@@ -236,7 +304,7 @@ export const authHandlers = [
     return HttpResponse.json({ ok: true });
   }),
 
-  // --- Invite details (validate token before showing the form) ------------
+  // --- Invite details -----------------------------------------------------
   http.get(`${API_BASE_URL}/auth/invite`, ({ request }) => {
     const token = new URL(request.url).searchParams.get('token') ?? '';
     const invite = SEED_INVITES.find((i) => i.token === token);
@@ -246,7 +314,7 @@ export const authHandlers = [
     return HttpResponse.json({ email: invite.email, name: invite.name, role: invite.role });
   }),
 
-  // --- Accept invite (set first password, auto sign-in) -------------------
+  // --- Accept invite ------------------------------------------------------
   http.post(`${API_BASE_URL}/auth/accept-invite`, async ({ request }) => {
     const parsed = acceptInviteRequestSchema.safeParse(await request.json());
     if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
@@ -264,18 +332,46 @@ export const authHandlers = [
     };
     extraAdmins.push(admin);
     consumedInvites.add(token);
-    const sessionToken = mintSession(admin.id);
     writeAudit({ actor: `user:${admin.id}`, action: 'auth.invite_accepted', resource: `user:${admin.id}` });
-    const body: LoginResponse = { token: sessionToken, user: toSessionUser(admin) };
-    return HttpResponse.json(body);
+    return HttpResponse.json(issueSession(admin));
   }),
 
-  // --- Account security snapshot (2FA state + active sessions) -------------
+  // --- Account security snapshot ------------------------------------------
   http.get(`${API_BASE_URL}/auth/security`, ({ request }) => {
     const admin = adminForRequest(request);
     if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
-    const body: SecurityInfo = { totpEnabled: twoFaEnabled(admin.id), sessions: sessionsFor(admin.id) };
+    const body: SecurityInfo = {
+      totpEnabled: twoFaEnrolled(admin.id),
+      totpRequired: roleRequires2fa(admin.role),
+      recoveryCodesRemaining: recoveryRemaining(admin.id),
+      sessions: sessionsFor(admin.id),
+    };
     return HttpResponse.json(body);
+  }),
+
+  // --- 2FA policy (super-admin edits which roles must use 2FA) -------------
+  http.get(`${API_BASE_URL}/auth/security/policy`, ({ request }) => {
+    const admin = adminForRequest(request);
+    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    return HttpResponse.json({ requiredRoles: [...twoFactorRequiredRoles] });
+  }),
+
+  http.put(`${API_BASE_URL}/auth/security/policy`, async ({ request }) => {
+    const admin = adminForRequest(request);
+    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    if (admin.role !== 'super-admin') {
+      return HttpResponse.json({ message: 'Bu ayarı yalnızca süper admin değiştirebilir.' }, { status: 403 });
+    }
+    const parsed = twoFactorPolicySchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
+    twoFactorRequiredRoles = new Set(parsed.data.requiredRoles);
+    writeAudit({
+      actor: `user:${admin.id}`,
+      action: 'auth.2fa_policy_changed',
+      resource: 'auth:policy',
+      after: { requiredRoles: parsed.data.requiredRoles.join(', ') || '—' },
+    });
+    return HttpResponse.json({ requiredRoles: [...twoFactorRequiredRoles] });
   }),
 
   // --- Change password ----------------------------------------------------
@@ -294,10 +390,12 @@ export const authHandlers = [
     return HttpResponse.json({ ok: true });
   }),
 
-  // --- 2FA: setup / enable / disable --------------------------------------
+  // --- 2FA: setup / enable / disable / recovery ---------------------------
   http.get(`${API_BASE_URL}/auth/2fa/setup`, ({ request }) => {
-    const admin = adminForRequest(request);
-    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    // Reachable with a session (opt-in) OR a mandatory-setup token (login).
+    const setupToken = new URL(request.url).searchParams.get('setupToken');
+    const ok = adminForRequest(request) || (setupToken && setupChallenges.has(setupToken));
+    if (!ok) return HttpResponse.json({ message: 'Yetkisiz.' }, { status: 401 });
     const body: TwoFactorSetup = DEMO_TOTP_SETUP;
     return HttpResponse.json(body);
   }),
@@ -311,19 +409,38 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Doğrulama kodu hatalı.' }, { status: 401 });
     }
     twoFactorOverrides.set(admin.id, true);
+    const codes = genRecoveryCodes(admin.id);
     writeAudit({ actor: `user:${admin.id}`, action: 'auth.2fa_enabled', resource: `user:${admin.id}` });
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ codes });
   }),
 
   http.post(`${API_BASE_URL}/auth/2fa/disable`, ({ request }) => {
     const admin = adminForRequest(request);
     if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    if (roleRequires2fa(admin.role)) {
+      return HttpResponse.json(
+        { message: 'Rol politikası gereği iki adımlı doğrulama kapatılamaz.' },
+        { status: 422 },
+      );
+    }
     twoFactorOverrides.set(admin.id, false);
+    recoveryCodes.delete(admin.id);
     writeAudit({ actor: `user:${admin.id}`, action: 'auth.2fa_disabled', resource: `user:${admin.id}` });
     return HttpResponse.json({ ok: true });
   }),
 
-  // --- Sessions: revoke one / revoke others -------------------------------
+  http.post(`${API_BASE_URL}/auth/2fa/recovery-codes/regenerate`, ({ request }) => {
+    const admin = adminForRequest(request);
+    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    if (!twoFaEnrolled(admin.id)) {
+      return HttpResponse.json({ message: 'Önce iki adımlı doğrulamayı açın.' }, { status: 422 });
+    }
+    const codes = genRecoveryCodes(admin.id);
+    writeAudit({ actor: `user:${admin.id}`, action: 'auth.recovery_codes_regenerated', resource: `user:${admin.id}` });
+    return HttpResponse.json({ codes });
+  }),
+
+  // --- Sessions -----------------------------------------------------------
   http.delete(`${API_BASE_URL}/auth/sessions/:id`, ({ request, params }) => {
     const admin = adminForRequest(request);
     if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
@@ -344,7 +461,7 @@ export const authHandlers = [
     return HttpResponse.json({ ok: true });
   }),
 
-  // --- Refresh the session token ------------------------------------------
+  // --- Refresh / re-auth --------------------------------------------------
   http.post(`${API_BASE_URL}/auth/refresh`, ({ request }) => {
     const token = bearer(request);
     const admin = adminForRequest(request);
@@ -355,7 +472,6 @@ export const authHandlers = [
     return HttpResponse.json({ token: fresh });
   }),
 
-  // --- Re-authenticate (idle lock) ----------------------------------------
   http.post(`${API_BASE_URL}/auth/reauth`, async ({ request }) => {
     const admin = adminForRequest(request);
     if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
@@ -365,5 +481,33 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Şifre hatalı.' }, { status: 401 });
     }
     return HttpResponse.json({ ok: true });
+  }),
+
+  // --- Organizations / tenant switcher ------------------------------------
+  http.get(`${API_BASE_URL}/auth/organizations`, ({ request }) => {
+    const admin = adminForRequest(request);
+    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    const ids = orgIdsForAdmin(admin);
+    const organizations = SEED_ORGS.filter((o) => ids.includes(o.id));
+    const activeOrgId = activeOrgByUser.get(admin.id) ?? organizations[0]?.id ?? DEFAULT_ORG_ID;
+    const body: OrganizationsResponse = { organizations, activeOrgId };
+    return HttpResponse.json(body);
+  }),
+
+  http.post(`${API_BASE_URL}/auth/organizations/active`, async ({ request }) => {
+    const admin = adminForRequest(request);
+    if (!admin) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
+    const parsed = z.object({ orgId: z.string().min(1) }).safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ message: 'Geçersiz istek.' }, { status: 422 });
+    if (!orgIdsForAdmin(admin).includes(parsed.data.orgId)) {
+      return HttpResponse.json({ message: 'Bu organizasyona erişiminiz yok.' }, { status: 422 });
+    }
+    activeOrgByUser.set(admin.id, parsed.data.orgId);
+    writeAudit({
+      actor: `user:${admin.id}`,
+      action: 'auth.org_switched',
+      resource: `org:${parsed.data.orgId}`,
+    });
+    return HttpResponse.json({ activeOrgId: parsed.data.orgId });
   }),
 ];

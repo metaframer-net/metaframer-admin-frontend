@@ -8,6 +8,7 @@ import { getAuditLog } from '@/lib/audit';
 import { useLayout } from '@/lib/layout/layout-context';
 import { setFeatureFlags } from '@/lib/settings/feature-flags-store';
 import { AuditTimeline } from '@/features/audit';
+import { TwoFactorPolicySection } from '@/features/auth/components/TwoFactorPolicySection';
 import { FEATURE_FLAGS, type LayoutDefaults } from '../schemas/settings';
 import { useSettings, useUpdateSettings } from '../api/hooks';
 import { SettingsSection } from '../components/SettingsSection';
@@ -81,6 +82,9 @@ export function SettingsPage() {
               <TabsTrigger value="layout" className={TAB_TRIGGER}>
                 Görünüm Varsayılanları
               </TabsTrigger>
+              <TabsTrigger value="security" className={TAB_TRIGGER}>
+                Güvenlik
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="general">
@@ -120,6 +124,15 @@ export function SettingsPage() {
                   onChange={(patch) => update.mutate({ layoutDefaults: patch })}
                   onApplyToDevice={() => applyToDevice(data.layoutDefaults)}
                 />
+              </SettingsSection>
+            </TabsContent>
+
+            <TabsContent value="security">
+              <SettingsSection
+                title="Güvenlik / İki adımlı doğrulama"
+                description="Hangi rollerin iki adımlı doğrulama kullanmak zorunda olduğunu belirleyin. Yalnızca süper admin düzenleyebilir."
+              >
+                <TwoFactorPolicySection />
               </SettingsSection>
             </TabsContent>
           </Tabs>

@@ -58,7 +58,21 @@ export function clearAuthToken(): void {
  */
 export const UNAUTHORIZED_EVENT = 'arsam:auth:unauthorized';
 
+// Distinguishes "the session expired" (a tokened 401) from "never signed in", so
+// the AuthGate can route to /session-expired vs /login. Consumed by the page.
+let sessionExpiredFlag = false;
+export function markSessionExpired(): void {
+  sessionExpiredFlag = true;
+}
+export function wasSessionExpired(): boolean {
+  return sessionExpiredFlag;
+}
+export function clearSessionExpired(): void {
+  sessionExpiredFlag = false;
+}
+
 export function emitUnauthorized(): void {
+  markSessionExpired();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }

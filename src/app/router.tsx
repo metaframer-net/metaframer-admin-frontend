@@ -5,9 +5,15 @@ import { AppShell } from '@/components/shell/AppShell';
 import { AuthGate } from '@/features/auth/components/AuthGate';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { TwoFactorPage } from '@/features/auth/pages/TwoFactorPage';
+import { TwoFactorSetupPage } from '@/features/auth/pages/TwoFactorSetupPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { AcceptInvitePage } from '@/features/auth/pages/AcceptInvitePage';
+import { SessionExpiredPage } from '@/features/auth/pages/SessionExpiredPage';
+import { AccountDisabledPage } from '@/features/auth/pages/AccountDisabledPage';
+import { AuthErrorPage } from '@/features/auth/pages/AuthErrorPage';
+import { UnauthorizedPage } from '@/features/auth/pages/UnauthorizedPage';
+import { SelectOrganizationPage } from '@/features/auth/pages/SelectOrganizationPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import type { RouteHandle } from './route-meta';
 
@@ -81,6 +87,11 @@ export const router = createBrowserRouter([
     handle: meta({ title: 'İki adımlı doğrulama', aiEntity: 'auth' }),
   },
   {
+    path: '/login/2fa/setup',
+    Component: TwoFactorSetupPage,
+    handle: meta({ title: 'İki adımlı doğrulama kurulumu', aiEntity: 'auth' }),
+  },
+  {
     path: '/forgot-password',
     Component: ForgotPasswordPage,
     handle: meta({ title: 'Şifremi unuttum', aiEntity: 'auth' }),
@@ -94,6 +105,37 @@ export const router = createBrowserRouter([
     path: '/accept-invite',
     Component: AcceptInvitePage,
     handle: meta({ title: 'Daveti tamamla', aiEntity: 'auth' }),
+  },
+  // Public status/error surfaces (outside AppShell + the auth gate).
+  {
+    path: '/session-expired',
+    Component: SessionExpiredPage,
+    handle: meta({ title: 'Oturum süresi doldu', aiEntity: 'auth' }),
+  },
+  {
+    path: '/account/disabled',
+    Component: AccountDisabledPage,
+    handle: meta({ title: 'Hesap askıda', aiEntity: 'auth' }),
+  },
+  {
+    path: '/unauthorized',
+    Component: UnauthorizedPage,
+    handle: meta({ title: 'Yetkisiz erişim', aiEntity: 'auth' }),
+  },
+  {
+    path: '/auth/error',
+    Component: AuthErrorPage,
+    handle: meta({ title: 'Kimlik doğrulama hatası', aiEntity: 'auth' }),
+  },
+  // Authenticated but shell-less: the org picker (a full-screen selection gate).
+  {
+    path: '/select-organization',
+    element: (
+      <AuthGate>
+        <SelectOrganizationPage />
+      </AuthGate>
+    ),
+    handle: meta({ title: 'Organizasyon seçin', aiEntity: 'organization' }),
   },
   // Protected — the whole app tree behind the AuthGate (authentication), which
   // runs BEFORE AppShell's RouteGuard (authorization/RBAC).

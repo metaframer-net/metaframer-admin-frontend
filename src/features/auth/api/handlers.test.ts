@@ -117,18 +117,19 @@ describe('auth handlers — password recovery', () => {
   });
 
   it('reset-password sets a new password that then works for login', async () => {
+    // support has no 2FA requirement, so a successful login yields a token directly.
     const forgot = await api.post<{ resetToken?: string }>('/auth/forgot-password', {
-      email: 'finance@arsam.net',
+      email: 'support@arsam.net',
     });
     await api.post<{ ok: boolean }>('/auth/reset-password', {
       token: forgot.resetToken,
       password: 'brandNew123',
     });
     // Old password no longer works…
-    const oldErr = await login('finance@arsam.net').catch((e: unknown) => e);
+    const oldErr = await login('support@arsam.net').catch((e: unknown) => e);
     expect((oldErr as ApiError).status).toBe(401);
     // …the new one does.
-    const res = await login('finance@arsam.net', 'brandNew123');
+    const res = await login('support@arsam.net', 'brandNew123');
     expect(res.token).toMatch(/^mock-/);
   });
 
@@ -256,5 +257,144 @@ describe('auth handlers — account security', () => {
     await api.post('/auth/reauth', { password: DEMO_PASSWORD });
     const err = await api.post('/auth/reauth', { password: 'wrong' }).catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(401);
+  });
+});
+
+describe('auth handlers — 2FA policy & enrollment (035)', () => {
+  it('forces enrollment at login for a required role, then issues a session + recovery codes', async () => {
+    // finance is required by policy but not enrolled in the seed.
+    const res = await login('finance@arsam.net');
+    expect(res.requires2faSetup).toBe(true);
+    expect(res.setupToken).toMatch(/^setup-/);
+    const done = await api.post<LoginResponse & { recoveryCodes: string[] }>('/auth/2fa/setup-complete', {
+      setupToken: res.setupToken,
+      code: DEMO_TOTP_CODE,
+    });
+    expect(done.token).toMatch(/^mock-/);
+    expect(done.recoveryCodes).toHaveLength(10);
+  });
+
+  it('setup-complete rejects a wrong code (401)', async () => {
+    const res = await login('finance@arsam.net');
+    const err = await api
+      .post('/auth/2fa/setup-complete', { setupToken: res.setupToken, code: '000000' })
+      .catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(401);
+  });
+
+  it('accepts a recovery code at the 2FA step (single use)', async () => {
+    // Enrol moderator, capture recovery codes.
+    const first = await login('moderator@arsam.net');
+    setAuthToken(first.token!);
+    const enable = await api.post<{ codes: string[] }>('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
+    const recovery = enable.codes[0]!;
+    clearAuthToken();
+
+    // Login again → challenge; verify with the recovery code.
+    const chal = await login('moderator@arsam.net');
+    expect(chal.requires2fa).toBe(true);
+    const done = await api.post<LoginResponse>('/auth/2fa/verify', {
+      challengeToken: chal.challengeToken,
+      code: recovery,
+    });
+    expect(done.token).toMatch(/^mock-/);
+
+    // Reusing the same recovery code fails.
+    const chal2 = await login('moderator@arsam.net');
+    const err = await api
+      .post('/auth/2fa/verify', { challengeToken: chal2.challengeToken, code: recovery })
+      .catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(401);
+  });
+
+  it('exposes + updates the policy (super-admin) and enforces the new roles', async () => {
+    const chal = await login('super@arsam.net');
+    const sess = await api.post<LoginResponse>('/auth/2fa/verify', { challengeToken: chal.challengeToken, code: DEMO_TOTP_CODE });
+    setAuthToken(sess.token!);
+    const pol = await api.get<{ requiredRoles: string[] }>('/auth/security/policy');
+    expect(pol.requiredRoles).toContain('super-admin');
+    const updated = await api.put<{ requiredRoles: string[] }>('/auth/security/policy', {
+      requiredRoles: ['super-admin', 'finance', 'moderator'],
+    });
+    expect(updated.requiredRoles).toContain('moderator');
+    clearAuthToken();
+    // moderator (not enrolled) now must enrol at login.
+    const mod = await login('moderator@arsam.net');
+    expect(mod.requires2faSetup).toBe(true);
+  });
+
+  it('rejects a policy change from a non-super-admin (403)', async () => {
+    const s = await login('support@arsam.net');
+    setAuthToken(s.token!);
+    const err = await api.put('/auth/security/policy', { requiredRoles: [] }).catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(403);
+  });
+
+  it('blocks disabling 2FA for a required role (422) but allows it otherwise', async () => {
+    const chal = await login('super@arsam.net');
+    const sess = await api.post<LoginResponse>('/auth/2fa/verify', { challengeToken: chal.challengeToken, code: DEMO_TOTP_CODE });
+    setAuthToken(sess.token!);
+    const err = await api.post('/auth/2fa/disable').catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(422);
+    clearAuthToken();
+
+    const m = await login('moderator@arsam.net');
+    setAuthToken(m.token!);
+    await api.post('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
+    const ok = await api.post<{ ok: boolean }>('/auth/2fa/disable');
+    expect(ok.ok).toBe(true);
+  });
+
+  it('regenerates recovery codes', async () => {
+    const m = await login('moderator@arsam.net');
+    setAuthToken(m.token!);
+    await api.post('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
+    const re = await api.post<{ codes: string[] }>('/auth/2fa/recovery-codes/regenerate');
+    expect(re.codes).toHaveLength(10);
+  });
+});
+
+describe('auth handlers — account status (036)', () => {
+  it('blocks a suspended account with 403 account_disabled', async () => {
+    const err = await login('disabled@arsam.net').catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(403);
+    expect(((err as ApiError).body as { code?: string })?.code).toBe('account_disabled');
+  });
+});
+
+describe('auth handlers — organizations (037)', () => {
+  async function authedSuper() {
+    const chal = await login('super@arsam.net');
+    const sess = await api.post<LoginResponse>('/auth/2fa/verify', {
+      challengeToken: chal.challengeToken,
+      code: DEMO_TOTP_CODE,
+    });
+    setAuthToken(sess.token!);
+    return sess;
+  }
+
+  it('lists a multi-org user and switches the active org', async () => {
+    await authedSuper();
+    const orgs = await api.get<{ organizations: { id: string }[]; activeOrgId: string }>('/auth/organizations');
+    expect(orgs.organizations.length).toBe(3);
+    expect(orgs.activeOrgId).toBe('org-main');
+    const upd = await api.post<{ activeOrgId: string }>('/auth/organizations/active', { orgId: 'org-ege' });
+    expect(upd.activeOrgId).toBe('org-ege');
+    const again = await api.get<{ activeOrgId: string }>('/auth/organizations');
+    expect(again.activeOrgId).toBe('org-ege');
+  });
+
+  it('gives a single-org user exactly one organization', async () => {
+    const m = await login('moderator@arsam.net');
+    setAuthToken(m.token!);
+    const orgs = await api.get<{ organizations: { id: string }[] }>('/auth/organizations');
+    expect(orgs.organizations.length).toBe(1);
+  });
+
+  it('rejects switching to a non-member org (422)', async () => {
+    const m = await login('moderator@arsam.net');
+    setAuthToken(m.token!);
+    const err = await api.post('/auth/organizations/active', { orgId: 'org-ege' }).catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(422);
   });
 });

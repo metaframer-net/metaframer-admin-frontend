@@ -8,14 +8,42 @@ import {
   type InviteDetails,
   type LoginInput,
   type LoginResponse,
+  type OrganizationsResponse,
   type SecurityInfo,
+  type TwoFactorPolicy,
   type TwoFactorSetup,
 } from '../schemas/auth';
 
 export const securityKeys = {
   info: ['auth', 'security'] as const,
   setup: ['auth', '2fa', 'setup'] as const,
+  policy: ['auth', 'security', 'policy'] as const,
 };
+
+export const orgKeys = { list: ['auth', 'organizations'] as const };
+
+/** The current user's organizations + the active one (tenant switcher). */
+export function useOrganizations(enabled = true) {
+  return useQuery({
+    queryKey: orgKeys.list,
+    queryFn: () => api.get<OrganizationsResponse>('/auth/organizations'),
+    enabled,
+  });
+}
+
+/** Switch the active organization/tenant. */
+export function useSetActiveOrg() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orgId: string) => api.post<{ activeOrgId: string }>('/auth/organizations/active', { orgId }),
+    onSuccess: (data) => {
+      qc.setQueryData<OrganizationsResponse>(orgKeys.list, (prev) =>
+        prev ? { ...prev, activeOrgId: data.activeOrgId } : prev,
+      );
+      toast.success('Organizasyon değiştirildi.');
+    },
+  });
+}
 
 /**
  * Extract a human message from a failed request. The mock backend returns
@@ -102,24 +130,66 @@ export function useChangePassword() {
   });
 }
 
-/** Fetch the 2FA enrollment secret/QR (only when the enable flow is open). */
-export function use2faSetup(enabled: boolean) {
+/**
+ * Fetch the 2FA enrollment secret/QR. Works both for the opt-in flow (session
+ * bearer) and the mandatory-at-login flow (pass the `setupToken`).
+ */
+export function use2faSetup(enabled: boolean, setupToken?: string) {
   return useQuery({
-    queryKey: securityKeys.setup,
-    queryFn: () => api.get<TwoFactorSetup>('/auth/2fa/setup'),
+    queryKey: [...securityKeys.setup, setupToken ?? 'session'] as const,
+    queryFn: () =>
+      api.get<TwoFactorSetup>(
+        setupToken ? `/auth/2fa/setup?setupToken=${encodeURIComponent(setupToken)}` : '/auth/2fa/setup',
+      ),
     enabled,
     staleTime: Infinity,
   });
 }
 
-/** Enable 2FA after verifying a code. */
+/** Enable 2FA after verifying a code; returns the one-time recovery codes. */
 export function useEnable2fa() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (code: string) => api.post<{ ok: boolean }>('/auth/2fa/enable', { code }),
+    mutationFn: (code: string) => api.post<{ codes: string[] }>('/auth/2fa/enable', { code }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: securityKeys.info });
       toast.success('İki adımlı doğrulama açıldı.');
+    },
+  });
+}
+
+/** Complete the mandatory 2FA enrollment at login → issues the session + codes. */
+export function useSetup2faComplete() {
+  return useMutation({
+    mutationFn: (input: { setupToken: string; code: string }) =>
+      api.post<LoginResponse & { recoveryCodes: string[] }>('/auth/2fa/setup-complete', input),
+  });
+}
+
+/** Regenerate the recovery codes (invalidates the old ones). */
+export function useRegenerateRecoveryCodes() {
+  return useMutation({
+    mutationFn: () => api.post<{ codes: string[] }>('/auth/2fa/recovery-codes/regenerate'),
+  });
+}
+
+/** Org-wide 2FA policy (which roles must use 2FA). */
+export function use2faPolicy() {
+  return useQuery({
+    queryKey: securityKeys.policy,
+    queryFn: () => api.get<TwoFactorPolicy>('/auth/security/policy'),
+  });
+}
+
+/** Update the 2FA policy (super-admin only). */
+export function useUpdate2faPolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (policy: TwoFactorPolicy) => api.put<TwoFactorPolicy>('/auth/security/policy', policy),
+    onSuccess: (data) => {
+      qc.setQueryData(securityKeys.policy, data);
+      void qc.invalidateQueries({ queryKey: securityKeys.info });
+      toast.success('2FA politikası güncellendi.');
     },
   });
 }
