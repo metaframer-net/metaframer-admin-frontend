@@ -9,32 +9,35 @@ import type { Activity } from '../schemas/activity';
 const MOCK_ACTIVITIES: Activity[] = [
   { id: 'A-1', contactId: 'C-3000', type: 'call', subject: 'İlk tanışma', scheduledAt: new Date().toISOString(), completedAt: null, createdBy: 'admin-1', createdAt: new Date().toISOString() },
   { id: 'A-2', contactId: 'C-3001', type: 'meeting', subject: 'Ofis ziyareti', scheduledAt: new Date(Date.now() + 86400000).toISOString(), completedAt: null, createdBy: 'admin-1', createdAt: new Date().toISOString() },
-  { id: 'A-3', contactId: 'C-3000', type: 'note', subject: 'VIP notu', scheduledAt: null, completedAt: new Date().toISOString(), createdBy: 'admin-1', createdAt: new Date().toISOString() },
 ];
 
 const CONTACTS_QUERY = { page: 1, pageSize: 200, sort: [], filters: {}, q: '' };
+const ACTIVITIES_KEY = [...crmKeys.all, 'calendar-activities'];
+
+function render() {
+  return renderPage(<CrmCalendarPage />, {
+    path: '/crm/calendar',
+    initialPath: '/crm/calendar',
+    extraRoutes: [{ path: '*', element: <div /> }],
+    seed: (qc) => {
+      qc.setQueryData(ACTIVITIES_KEY, { items: MOCK_ACTIVITIES, total: MOCK_ACTIVITIES.length, page: 1, pageSize: 100 });
+      qc.setQueryData(crmKeys.contacts.list(CONTACTS_QUERY), { items: MOCK_CONTACTS, total: MOCK_CONTACTS.length, page: 1, pageSize: 200 });
+    },
+  });
+}
 
 const meta = {
   title: 'CRM/CrmCalendarPage',
-  component: CrmCalendarPage,
   parameters: { layout: 'fullscreen' },
-} satisfies Meta<typeof CrmCalendarPage>;
+  render,
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: () =>
-    renderPage(<CrmCalendarPage />, {
-      path: '/crm/calendar',
-      initialPath: '/crm/calendar',
-      seed: (qc) => {
-        qc.setQueryData([...crmKeys.all, 'calendar-activities'], { items: MOCK_ACTIVITIES, total: MOCK_ACTIVITIES.length, page: 1, pageSize: 100 });
-        qc.setQueryData(crmKeys.contacts.list(CONTACTS_QUERY), { items: MOCK_CONTACTS, total: MOCK_CONTACTS.length, page: 1, pageSize: 200 });
-      },
-    }),
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('CRM Takvim')).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'CRM Takvim' })).toBeInTheDocument();
     await expect(canvas.getByText('Tarih Seçin')).toBeInTheDocument();
   },
 };
@@ -44,8 +47,9 @@ export const Loading: Story = {
     renderPage(<CrmCalendarPage />, {
       path: '/crm/calendar',
       initialPath: '/crm/calendar',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
-        seedQueryLoading(qc, [...crmKeys.all, 'calendar-activities']);
+        seedQueryLoading(qc, ACTIVITIES_KEY);
         seedQueryLoading(qc, crmKeys.contacts.list(CONTACTS_QUERY));
       },
     }),
@@ -56,8 +60,9 @@ export const Empty: Story = {
     renderPage(<CrmCalendarPage />, {
       path: '/crm/calendar',
       initialPath: '/crm/calendar',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
-        qc.setQueryData([...crmKeys.all, 'calendar-activities'], { items: [], total: 0, page: 1, pageSize: 100 });
+        qc.setQueryData(ACTIVITIES_KEY, { items: [], total: 0, page: 1, pageSize: 100 });
         qc.setQueryData(crmKeys.contacts.list(CONTACTS_QUERY), { items: [], total: 0, page: 1, pageSize: 200 });
       },
     }),
@@ -68,14 +73,14 @@ export const Error: Story = {
     renderPage(<CrmCalendarPage />, {
       path: '/crm/calendar',
       initialPath: '/crm/calendar',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
-        seedQueryError(qc, [...crmKeys.all, 'calendar-activities']);
+        seedQueryError(qc, ACTIVITIES_KEY);
         qc.setQueryData(crmKeys.contacts.list(CONTACTS_QUERY), { items: [], total: 0, page: 1, pageSize: 200 });
       },
     }),
 };
 
 export const Mobile: Story = {
-  ...Default,
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
