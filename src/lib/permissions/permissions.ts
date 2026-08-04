@@ -28,9 +28,12 @@ export const matrix: PermissionMatrix = {
     'agent.verify',
     'message.moderate',
     'listing.view',
+    'crm.view',
+    'crm.edit',
+    'crm.delete',
   ],
   finance: ['promotion.sell', 'payment.refund', 'report.view', 'listing.view'],
-  analyst: ['report.view', 'listing.view', 'audit.view'],
+  analyst: ['report.view', 'listing.view', 'audit.view', 'crm.view'],
 };
 
 /** Pure permission check against an explicit matrix (the runtime-editable copy). */

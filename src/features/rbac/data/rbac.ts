@@ -108,6 +108,15 @@ export const PERMISSION_CATALOG: CatalogGroup[] = [
     ],
   },
   {
+    resource: 'crm',
+    label: 'CRM',
+    actions: [
+      { permission: 'crm.view', label: 'Görüntüle', help: 'CRM kişi ve lead listesini görme.' },
+      { permission: 'crm.edit', label: 'Düzenle', help: 'Kişi ve lead oluşturma/düzenleme.' },
+      { permission: 'crm.delete', label: 'Sil', help: 'Kişi veya lead silme.' },
+    ],
+  },
+  {
     resource: 'settings',
     label: 'Ayarlar',
     actions: [
