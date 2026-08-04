@@ -1581,3 +1581,75 @@ build/build-storybook all green. Awaiting the user's phase-by-phase manual commi
   via a `revokedTokens` set (invalidation tests stay green).
 - Live browser smoke via the chrome-devtools MCP was unavailable (Google Chrome not installed in this environment);
   Playwright/Chromium (already used by the Storybook test project) was used instead.
+
+## Auth completeness arc (035 → 037) — MARATHON (current design; UI redesign deferred to end)
+Goal: finish the admin auth surface with no gaps, in the current Calm Signal look. SSO dropped entirely
+(user decision — not even a placeholder). Tenant switcher IS in scope (037).
+
+- **035 — 2FA realism & policy.** DONE. Fixes the "why does super-admin get asked for a code?" concern:
+  2FA is now POLICY-DRIVEN, not a per-seed hardcode.
+  - Policy: `TWO_FACTOR_REQUIRED_ROLES` seed `['super-admin','finance']`; runtime-editable by super-admin via a new
+    Settings → **Güvenlik** tab (`TwoFactorPolicySection`/`TwoFactorPolicyForm`, `GET/PUT /auth/security/policy`,
+    audited `auth.2fa_policy_changed`). Members of required roles MUST enrol; everyone else may opt in.
+  - Login branches: enrolled → challenge; required-but-not-enrolled → **mandatory enrollment** (`requires2faSetup`
+    + `setupToken` → new `/login/2fa/setup` page → `POST /auth/2fa/setup-complete` issues session + recovery codes);
+    otherwise → straight session. (Super-admin is enrolled in the seed, finance is not — demo shows both paths.)
+  - Recovery codes: 10 one-time codes generated on enrollment (opt-in + mandatory), shown once (`RecoveryCodes`
+    component), usable at the verify step (`TwoFactorForm allowRecovery`), regenerable from account security.
+  - Account security 2FA card reworked: enrolled/required states, recovery-codes-remaining + regenerate, enable now
+    reveals the codes, disable BLOCKED (422) when the role requires 2FA.
+  - `api.put` added to the client. New audit actions: `2fa_setup_required`, `2fa_enabled`, `2fa_policy_changed`,
+    `recovery_codes_regenerated`.
+  - Decisions/assumptions:
+    - Enforcement lives in the auth MSW backend (login reads the runtime policy); the Settings tab edits it via the
+      auth endpoints. Non-super-admins see the policy read-only.
+    - Still mock: single demo TOTP code `123456`, static secret (no real QR image / TOTP clock). Recovery codes are
+      deterministic mock strings. Swap-ready for FastAPI/real TOTP.
+  - Verification: typecheck clean · lint 0 errors (22 warnings, pre-existing patterns) · auth unit 42/42 + auth/settings
+    storybook 92/92 (isolated) · full `npm run test` 1171/1171 on a clean run (the flaky "Error"-story timeouts under
+    parallel browser load are pre-existing + unrelated) · build + build-storybook green.
+  - Suggested commit message:
+    `feat(auth): make 2FA policy-driven (opt-in + role-enforced) with mandatory enrollment & recovery codes`
+
+- **036 — Auth status/error pages.** DONE.
+  - Pages (public, shared `AuthStatusPage` on the AuthShell chrome): `/session-expired`, `/account/disabled`,
+    `/auth/error` (generic fallback), `/unauthorized` (standalone 403; the in-shell RBAC `ForbiddenPage` stays primary).
+  - Wiring: a tokened 401 now marks a `sessionExpired` flag (`lib/api/auth-token`), so `AuthGate` routes an expired
+    session to `/session-expired` (vs `/login` for a fresh visit); `SessionExpiredPage` consumes the flag on mount.
+    A suspended admin (new `disabled` seed flag + `disabled@arsam.net` seed) is blocked at login with `403
+    { code: 'account_disabled' }`; `LoginPage` forwards to `/account/disabled`. New audit action `login_blocked_disabled`.
+  - Tests: AuthGate expired→/session-expired; handler disabled-account 403; status-page stories (a11y).
+  - Verification: typecheck clean · lint 0 errors (22 warnings) · auth unit 44/44 + auth storybook 70/70 (isolated) ·
+    full `npm run test` 1178/1178 on a clean run · build + build-storybook green.
+  - Suggested commit message:
+    `feat(auth): add session-expired / account-disabled / unauthorized / auth-error status pages + routing`
+
+- **037 — Organization / tenant switcher.** DONE.
+  - Model: `Organization` {id,name}; `SEED_ORGS` (arsam.net / arsam Kurumsal / arsam Ege Bölge); admins carry `orgs`
+    membership (super-admin → all 3; everyone else → the main org). `DEFAULT_ORG_ID = 'org-main'`.
+  - MSW: `GET /auth/organizations` → { organizations (the user's), activeOrgId (default first) }; `POST
+    /auth/organizations/active` (membership-guarded, 422 for non-members; audited `auth.org_switched`).
+  - Hooks: `useOrganizations(enabled)`, `useSetActiveOrg` (+ `orgKeys`).
+  - UI: `OrgSwitcher` (dropdown in `TopbarActions`; renders NOTHING for single-org users, so most admins never see
+    it); `/select-organization` — a full-screen, shell-less picker behind `AuthGate` that auto-redirects when the
+    user has ≤1 org. Reached from the switcher or directly.
+  - Decisions/assumptions:
+    - Active org lives in the mock backend runtime (per user); it resets to the first org on reload (in-memory mock).
+      NO SSO anywhere (dropped by user decision — not even a placeholder).
+    - Data is NOT yet org-partitioned (a full multi-tenant data model is out of scope) — switching changes the active
+      org + audits it, but feature data doesn't re-scope yet. Noted for the real backend.
+  - Verification: typecheck clean · lint 0 errors · auth unit 47/47 + auth storybook 77/77 (isolated) · full
+    `npm run test` 1214/1214 on a clean settled-tree run · build + build-storybook green.
+  - Suggested commit message:
+    `feat(auth): add organization/tenant model, switcher, and /select-organization picker`
+
+## Auth completeness arc COMPLETE (035 → 037)
+Admin auth surface is now gap-free in the current design: 2FA is policy-driven (opt-in + role-enforced, mandatory
+enrollment, recovery codes), status/error pages exist (session-expired / account-disabled / unauthorized / auth-error),
+and organizations have a tenant switcher + picker. SSO intentionally excluded. UI redesign (design directions D1–D4 in
+`docs/mockups/design-directions.html`) deferred to the end per the user. Final settled-tree verification: typecheck /
+lint (0 errors) / build / build-storybook green; `npm run test` 1214/1214.
+
+NOTE: a parallel session landed dashboard/sidebar/CRM work in the same tree during this arc. The full verification above
+was run on the settled tree AFTER that work completed and is green. Commit the auth files EXPLICITLY (see final report's
+per-phase `git add` lists) so auth and the parallel UI work stay in separate commits.

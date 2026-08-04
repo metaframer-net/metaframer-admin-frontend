@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 
 import { Separator } from '@/components/ui/separator';
+import { OrgSwitcher } from '@/features/auth/components/OrgSwitcher';
 import { ThemeToggle } from './ThemeToggle';
 import { DensityToggle } from './DensityToggle';
 import { LayoutSwitcher } from './LayoutSwitcher';
@@ -12,6 +13,7 @@ export function TopbarActions() {
   const { setOpen } = useCommandPalette();
   return (
     <div className="flex items-center gap-1.5">
+      <OrgSwitcher />
       <button
         type="button"
         onClick={() => setOpen(true)}
