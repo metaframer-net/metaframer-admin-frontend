@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { wasSessionExpired } from '@/lib/api/auth-token';
 
 /**
  * Authentication gate for the protected route tree. Runs BEFORE the RBAC
@@ -34,6 +35,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (status === 'unauthenticated') {
+    // A tokened 401 (expired/revoked) routes to the dedicated info page; a plain
+    // "not signed in" goes to login preserving the target.
+    if (wasSessionExpired()) return <Navigate to="/session-expired" replace />;
     const returnTo = encodeURIComponent(`${location.pathname}${location.search}`);
     return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
