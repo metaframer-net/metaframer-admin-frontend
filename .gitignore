@@ -35,3 +35,6 @@ Thumbs.db
 # Claude Code local
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Scripts
+sync-main-to-bora.sh
