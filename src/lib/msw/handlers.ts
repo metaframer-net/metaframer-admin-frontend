@@ -15,6 +15,7 @@ import { auditHandlers } from '@/features/audit/api/handlers';
 import { rbacHandlers } from '@/features/rbac/api/handlers';
 import { settingsHandlers } from '@/features/settings/api/handlers';
 import { authHandlers } from '@/features/auth/api/handlers';
+import { crmHandlers } from '@/features/crm/api/handlers';
 
 /**
  * Demo endpoint proving the resource contract:
@@ -71,4 +72,5 @@ export const handlers = [
   ...rbacHandlers,
   // Exact `/settings` route; no param-route prefix collision.
   ...settingsHandlers,
+  ...crmHandlers,
 ];

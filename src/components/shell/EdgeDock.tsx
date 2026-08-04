@@ -35,7 +35,7 @@ const LERP_IN = 0.2;
 const LERP_OUT = 0.12;
 /* How close (px) the pointer must get to the collapsed hint before the dock opens — a
    proximity zone so you don't have to land exactly on the thin hint bar. */
-const PROXIMITY = 64;
+const PROXIMITY = 12;
 
 /** Resting center of icon i along the main axis (no magnification). */
 function restCenter(i: number): number {
@@ -629,7 +629,6 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
     <div
       ref={wrapperRef}
       className={cn('fixed z-30', cfg.wrapper)}
-      onMouseEnter={() => setOpen(true)}
       onBlur={(e) => closeIfOutside(e.relatedTarget)}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {

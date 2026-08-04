@@ -32,6 +32,11 @@ const ModerationQueuePage = named(() => import('@/features/listings'), 'Moderati
 const UsersListPage = named(() => import('@/features/users'), 'UsersListPage');
 const OfficesListPage = named(() => import('@/features/users'), 'OfficesListPage');
 const UserDetailPage = named(() => import('@/features/users'), 'UserDetailPage');
+const CrmContactsPage = named(() => import('@/features/crm'), 'CrmContactsPage');
+const CrmLeadsPage = named(() => import('@/features/crm'), 'CrmLeadsPage');
+const CrmContactDetailPage = named(() => import('@/features/crm'), 'CrmContactDetailPage');
+const CrmPipelinePage = named(() => import('@/features/crm'), 'CrmPipelinePage');
+const CrmCalendarPage = named(() => import('@/features/crm'), 'CrmCalendarPage');
 const CategoriesListPage = named(() => import('@/features/categories'), 'CategoriesListPage');
 const CategoryDetailPage = named(() => import('@/features/categories'), 'CategoryDetailPage');
 const LocationsListPage = named(() => import('@/features/locations'), 'LocationsListPage');
@@ -137,6 +142,33 @@ export const router = createBrowserRouter([
             path: ':id',
             Component: UserDetailPage,
             handle: meta({ title: 'Kullanıcı Detayı', permission: 'user.view', aiEntity: 'user' }),
+          },
+        ],
+      },
+      {
+        path: 'crm',
+        handle: meta({ title: 'CRM & Portföy', permission: 'crm.view', aiEntity: 'contact' }),
+        children: [
+          { index: true, Component: CrmContactsPage },
+          {
+            path: 'leads',
+            Component: CrmLeadsPage,
+            handle: meta({ title: 'Leadler', permission: 'crm.view', aiEntity: 'lead' }),
+          },
+          {
+            path: 'pipeline',
+            Component: CrmPipelinePage,
+            handle: meta({ title: 'Pipeline Raporları', permission: 'crm.view', aiEntity: 'lead' }),
+          },
+          {
+            path: 'calendar',
+            Component: CrmCalendarPage,
+            handle: meta({ title: 'Takvim', permission: 'crm.view', aiEntity: 'activity' }),
+          },
+          {
+            path: ':id',
+            Component: CrmContactDetailPage,
+            handle: meta({ title: 'Kişi Detayı', permission: 'crm.view', aiEntity: 'contact' }),
           },
         ],
       },

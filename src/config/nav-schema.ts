@@ -11,6 +11,10 @@ import {
   ScrollText,
   ShieldCheck,
   Settings,
+  ContactRound,
+  Target,
+  TrendingUp,
+  CalendarDays,
 } from 'lucide-react';
 
 import type { Permission } from '@/lib/permissions/permissions';
@@ -75,6 +79,21 @@ export const navSchema: NavItem[] = [
     children: [
       { id: 'users-all', label: 'Kullanıcılar', icon: Users, to: '/users', permission: 'user.view', aiEntity: 'user' },
       { id: 'users-agents', label: 'Emlak Ofisleri', icon: Building2, to: '/users/agents', permission: 'agent.verify', aiEntity: 'agent' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM & Portföy',
+    description: 'Müşteri ilişkileri, lead yönetimi ve satıcı portföyü',
+    icon: ContactRound,
+    to: '/crm',
+    permission: 'crm.view',
+    aiEntity: 'contact',
+    children: [
+      { id: 'crm-contacts', label: 'Kişiler', icon: ContactRound, to: '/crm', permission: 'crm.view', aiEntity: 'contact' },
+      { id: 'crm-leads', label: 'Leadler', icon: Target, to: '/crm/leads', permission: 'crm.view', aiEntity: 'lead' },
+      { id: 'crm-pipeline', label: 'Pipeline Raporları', icon: TrendingUp, to: '/crm/pipeline', permission: 'crm.view', aiEntity: 'lead' },
+      { id: 'crm-calendar', label: 'Takvim', icon: CalendarDays, to: '/crm/calendar', permission: 'crm.view', aiEntity: 'activity' },
     ],
   },
   {
