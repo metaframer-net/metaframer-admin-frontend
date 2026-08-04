@@ -32,6 +32,7 @@ export function TwoFactorPage() {
       subtitle="Hesabınızı korumak için doğrulama kodunu girin."
     >
       <TwoFactorForm
+        allowRecovery
         onSubmit={(code) =>
           verify.mutate(
             { challengeToken, code },
