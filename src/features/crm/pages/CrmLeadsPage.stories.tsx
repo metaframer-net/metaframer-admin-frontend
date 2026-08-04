@@ -5,28 +5,37 @@ import { CrmLeadsPage } from './CrmLeadsPage';
 import { crmKeys } from '../api/queries';
 import { renderPage, seedQueryError, seedQueryLoading, MOCK_LEADS } from './page-story-utils';
 
+const defaultQuery = { page: 1, pageSize: 25, sort: [], filters: {}, q: '' };
+
+function render() {
+  return renderPage(<CrmLeadsPage />, {
+    path: '/crm/leads',
+    initialPath: '/crm/leads',
+    extraRoutes: [{ path: '*', element: <div /> }],
+    seed: (qc) => {
+      qc.setQueryData(crmKeys.leads.list(defaultQuery), {
+        items: MOCK_LEADS,
+        total: MOCK_LEADS.length,
+        page: 1,
+        pageSize: 25,
+      });
+    },
+  });
+}
+
 const meta = {
   title: 'CRM/CrmLeadsPage',
-  component: CrmLeadsPage,
   parameters: { layout: 'fullscreen' },
-} satisfies Meta<typeof CrmLeadsPage>;
+  render,
+} satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const defaultQuery = { page: 1, pageSize: 25, sort: [], filters: {}, q: '' };
-
 export const Default: Story = {
-  render: () =>
-    renderPage(<CrmLeadsPage />, {
-      path: '/crm/leads',
-      initialPath: '/crm/leads',
-      seed: (qc) => {
-        qc.setQueryData(crmKeys.leads.list(defaultQuery), { items: MOCK_LEADS, total: MOCK_LEADS.length, page: 1, pageSize: 25 });
-      },
-    }),
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Satılık daire paketi')).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'CRM — Leadler' })).toBeInTheDocument();
+    await expect((await canvas.findAllByText('Satılık daire paketi')).length).toBeGreaterThan(0);
   },
 };
 
@@ -35,6 +44,7 @@ export const Loading: Story = {
     renderPage(<CrmLeadsPage />, {
       path: '/crm/leads',
       initialPath: '/crm/leads',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
         seedQueryLoading(qc, crmKeys.leads.list(defaultQuery));
       },
@@ -46,6 +56,7 @@ export const Empty: Story = {
     renderPage(<CrmLeadsPage />, {
       path: '/crm/leads',
       initialPath: '/crm/leads',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
         qc.setQueryData(crmKeys.leads.list(defaultQuery), { items: [], total: 0, page: 1, pageSize: 25 });
       },
@@ -57,6 +68,7 @@ export const Error: Story = {
     renderPage(<CrmLeadsPage />, {
       path: '/crm/leads',
       initialPath: '/crm/leads',
+      extraRoutes: [{ path: '*', element: <div /> }],
       seed: (qc) => {
         seedQueryError(qc, crmKeys.leads.list(defaultQuery));
       },
@@ -64,6 +76,5 @@ export const Error: Story = {
 };
 
 export const Mobile: Story = {
-  ...Default,
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
