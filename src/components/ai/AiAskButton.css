@@ -1,0 +1,207 @@
+/*
+ * AI "Ask AI" launcher — liquid-glass circular button.
+ * Structure adapted from the reference Button01, but every color is re-derived
+ * from OUR semantic tokens (var(--primary)/--accent/--foreground/…) via color-mix,
+ * so it re-tints with the theme and contains NO hardcoded colors. Light values
+ * live on `.ask-btn`; dark overrides on `.dark .ask-btn` only where a semantic
+ * token does not already flip correctly (the light "sheen" highlight).
+ */
+.ask-btn {
+  /* Derived, component-scoped tokens (semantic-token references only). */
+  --ask-highlight: color-mix(in oklab, var(--primary-foreground) 72%, transparent);
+  --ask-ring: color-mix(in oklab, var(--primary) 60%, transparent);
+  --ask-icon: var(--primary);
+  --ask-icon-glow: color-mix(in oklab, var(--primary) 40%, transparent);
+  --ask-text-from: var(--foreground);
+  --ask-text-to: var(--primary);
+  --ask-glass-top: color-mix(in oklab, var(--primary) 14%, transparent);
+  /* Near-opaque token surface so label/icon contrast holds over ANY page
+     content behind the fixed launcher (WCAG 1.4.3). Kept slightly translucent
+     for the glass feel; backdrop-filter blur further stabilizes the backdrop. */
+  --ask-surface: color-mix(in oklab, var(--card) 90%, transparent);
+  --ask-shadow: var(--scrim);
+  --ask-glow: color-mix(in oklab, var(--primary) 28%, transparent);
+  --ask-dot-from: color-mix(in oklab, var(--primary) 60%, transparent);
+  --ask-dot-to: color-mix(in oklab, var(--accent) 45%, transparent);
+
+  position: relative;
+  width: var(--ask-size, 84px);
+  height: var(--ask-size, 84px);
+  border-radius: 9999px;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  transition:
+    transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 300ms ease;
+  box-shadow:
+    0 1px 0 var(--ask-highlight) inset,
+    0 -1px 1px var(--ask-shadow) inset,
+    0 18px 44px var(--ask-glow),
+    0 8px 20px var(--ask-shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+}
+
+.dark .ask-btn {
+  --ask-highlight: color-mix(in oklab, var(--foreground) 28%, transparent);
+  --ask-surface: color-mix(in oklab, var(--card) 92%, transparent);
+}
+
+.ask-btn:hover {
+  transform: scale(1.04);
+  box-shadow:
+    0 1px 0 var(--ask-highlight) inset,
+    0 -1px 1px var(--ask-shadow) inset,
+    0 26px 60px var(--ask-glow),
+    0 12px 26px var(--ask-shadow);
+}
+
+.ask-btn:active {
+  transform: scale(0.97);
+}
+
+.ask-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.ask-btn__dots {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: -2;
+  background:
+    radial-gradient(120% 100% at 50% 50%, var(--ask-glass-top) 0%, transparent 80%),
+    var(--ask-surface);
+}
+
+.ask-btn__glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      80% 60% at 30% 15%,
+      var(--ask-highlight) 0%,
+      color-mix(in srgb, var(--ask-highlight) 18%, transparent) 40%,
+      transparent 65%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--ask-highlight) 20%, transparent), transparent);
+}
+
+.ask-btn__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1.5px;
+  background: linear-gradient(
+    140deg,
+    var(--ask-ring),
+    color-mix(in srgb, var(--ask-ring) 18%, transparent) 35%,
+    transparent 55%,
+    color-mix(in srgb, var(--ask-ring) 30%, transparent) 80%,
+    var(--ask-ring)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.ask-btn__shine {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transform: skewX(-18deg);
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--ask-highlight) 80%, transparent) 50%,
+    transparent 100%
+  );
+  transition: opacity 150ms ease;
+}
+
+.ask-btn:hover .ask-btn__shine {
+  opacity: 1;
+  animation: ask-shine 1.2s ease forwards;
+}
+
+.ask-btn__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(3px, calc(var(--ask-size, 84px) * 0.055), 10px);
+  width: 100%;
+  height: 100%;
+}
+
+.ask-btn__icon {
+  color: var(--ask-icon);
+  filter: drop-shadow(0 0 10px var(--ask-icon-glow));
+  transition: transform 500ms ease;
+  display: grid;
+  place-items: center;
+}
+
+.ask-btn:hover .ask-btn__icon {
+  transform: rotate(12deg) scale(1.1);
+}
+
+.ask-btn__icon svg {
+  width: clamp(18px, calc(var(--ask-size, 84px) * 0.24), 44px);
+  height: clamp(18px, calc(var(--ask-size, 84px) * 0.24), 44px);
+}
+
+.ask-btn__label {
+  font-size: clamp(11px, calc(var(--ask-size, 84px) * 0.13), 32px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  background-image: linear-gradient(180deg, var(--ask-text-from) 0%, var(--ask-text-to) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes ask-shine {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 120%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-btn,
+  .ask-btn__icon,
+  .ask-btn__shine {
+    transition: none;
+  }
+  .ask-btn:hover {
+    transform: none;
+  }
+  .ask-btn:hover .ask-btn__icon {
+    transform: none;
+  }
+  .ask-btn:hover .ask-btn__shine {
+    opacity: 0;
+    animation: none;
+  }
+}
