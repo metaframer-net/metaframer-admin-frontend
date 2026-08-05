@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 
 import { DashboardPage } from './DashboardPage';
 import { dashboardKeys, type DashboardStats } from '../api/queries';
+import { DASHBOARD_INSIGHTS } from '../api/handlers';
+import { DASHBOARD_STORAGE_KEY } from '@/config/dashboard-layout';
 import { listingKeys } from '@/features/listings/api/queries';
 import type { TableQuery } from '@/components/data-table/types';
 import {
@@ -58,7 +60,7 @@ const EMPTY_STATS: DashboardStats = {
   trends: { totalListings: [], pending: [], active: [], rejected: [] },
 };
 
-type Mode = 'seeded' | 'loading' | 'empty' | 'error';
+type Mode = 'seeded' | 'loading' | 'empty' | 'error' | 'insights-error';
 
 function render(mode: Mode = 'seeded') {
   return renderPage(<DashboardPage />, {
@@ -66,17 +68,39 @@ function render(mode: Mode = 'seeded') {
     initialPath: '/',
     extraRoutes: [{ path: '*', element: <div /> }],
     seed: (qc) => {
+      // Each story starts from the DEFAULT layout — clear any persisted
+      // personalization so remove/reorder interactions don't leak between stories.
+      try {
+        window.localStorage.removeItem(DASHBOARD_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
       if (mode === 'loading') {
-        // Real loading branch → shape-matched skeletons (KPI bars, chart/donut silhouettes).
         seedQueryLoading(qc, dashboardKeys.stats);
+        seedQueryLoading(qc, dashboardKeys.insights);
         seedQueryLoading(qc, listingKeys.list(PENDING_QUERY));
         return;
       }
       if (mode === 'error') {
         seedQueryError(qc, dashboardKeys.stats);
+        qc.setQueryData(dashboardKeys.insights, DASHBOARD_INSIGHTS);
+        return;
+      }
+      if (mode === 'insights-error') {
+        // stats OK but insights fails — the board must STILL show the error
+        // state (most widgets read from insights), not confident zeroes.
+        qc.setQueryData(dashboardKeys.stats, STATS);
+        seedQueryError(qc, dashboardKeys.insights);
+        qc.setQueryData(listingKeys.list(PENDING_QUERY), {
+          items: MOCK_LISTINGS.filter((l) => l.status === 'pending'),
+          total: 12,
+          page: 1,
+          pageSize: 5,
+        });
         return;
       }
       qc.setQueryData(dashboardKeys.stats, mode === 'empty' ? EMPTY_STATS : STATS);
+      qc.setQueryData(dashboardKeys.insights, DASHBOARD_INSIGHTS);
       qc.setQueryData(listingKeys.list(PENDING_QUERY), {
         items: mode === 'empty' ? [] : MOCK_LISTINGS.filter((l) => l.status === 'pending'),
         total: mode === 'empty' ? 0 : 12,
@@ -96,71 +120,118 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Genel (default) section — KPI band + category/status/pending widgets. */
 export const Default: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByRole('heading', { name: 'Genel Bakış' })).toBeInTheDocument();
-    await expect(await canvas.findByText('Toplam İlan')).toBeInTheDocument();
+    await expect(await canvas.findByText('Toplam ilan')).toBeInTheDocument();
     await expect(canvas.getByText('Kategoriye göre ilanlar')).toBeInTheDocument();
-    // Status donut renders with real seeded data (unique legend label + title).
     await expect(canvas.getByText('Duruma göre dağılım')).toBeInTheDocument();
-    await expect(canvas.getByText('Arşivlendi')).toBeInTheDocument();
   },
 };
+
+/** Switching sections swaps the visible widget set to a full, section-specific board. */
+export const SectionSwitch: Story = {
+  play: async ({ canvas }) => {
+    // Section switch is an ARIA tablist (role="tab"), not toggle buttons.
+    await userEvent.click(canvas.getByRole('tab', { name: 'Moderasyon' }));
+    await expect(await canvas.findByText('Kuyruk yaşlanma — SLA')).toBeInTheDocument();
+    await expect(canvas.getByText('Moderatör performansı')).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('tab', { name: 'Gelir' }));
+    await expect(await canvas.findByText('En çok kazandıran emlakçılar')).toBeInTheDocument();
+    await expect(canvas.getByText('Gelir kırılımı')).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('tab', { name: 'Trafik' }));
+    await expect(await canvas.findByText('Trafik kaynağı')).toBeInTheDocument();
+    await expect(canvas.getByText('Popüler aramalar')).toBeInTheDocument();
+  },
+};
+
+/** The period toggle re-labels + re-values the period-scoped KPIs. */
+export const PeriodSwitch: Story = {
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText('Gelir · Bugün')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: '30 gün' }));
+    await expect(await canvas.findByText('Gelir · 30 gün')).toBeInTheDocument();
+  },
+};
+
+/** Edit mode: remove a widget, then re-add it from the library dialog. */
+export const EditRemoveAndAdd: Story = {
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Düzenle' }));
+    // Remove the "Hızlı erişim" widget via its labelled remove control.
+    const removeBtn = await canvas.findByRole('button', { name: /Hızlı erişim.*kaldır/ });
+    await userEvent.click(removeBtn);
+    await expect(canvas.queryByText('Hızlı erişim')).not.toBeInTheDocument();
+
+    // Re-add it from the library dialog (rendered in a portal → document scope).
+    await userEvent.click(canvas.getByRole('button', { name: /Widget ekle/ }));
+    const dialog = within(await within(document.body).findByRole('dialog'));
+    await userEvent.click(dialog.getByRole('button', { name: 'Ekle' }));
+    await expect(await canvas.findByText('Hızlı erişim')).toBeInTheDocument();
+  },
+};
+
 export const Mobile: Story = { parameters: { viewport: { defaultViewport: 'mobile1' } } };
-/** Smallest phone (320px) — KPI band drops to 1-up; all four tiles stay legible. */
+
+/** Smallest phone (320px) — widgets stack 1-up. */
 export const Phone: Story = {
   parameters: { viewport: { defaultViewport: 'bpXs' } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('heading', { name: 'Genel Bakış' })).toBeInTheDocument();
-    // All four KPI tiles render (1-up column at this width). "Yayında" also appears
-    // as a donut legend label, so assert presence via findAllByText.
-    await expect(await canvas.findByText('Toplam İlan')).toBeInTheDocument();
-    await expect(canvas.getByText('Bekleyen Moderasyon')).toBeInTheDocument();
-    await expect((await canvas.findAllByText('Yayında')).length).toBeGreaterThan(0);
-    await expect(canvas.getByText('Reddedilen')).toBeInTheDocument();
+    await expect(await canvas.findByText('Toplam ilan')).toBeInTheDocument();
   },
 };
-/** Tablet portrait (768px) — bento at 2-up mosaic: KPI 2-up, category chart + donut
- *  side-by-side (span-1), pending queue full-width, recent + quick-access paired. */
+
+/** Tablet portrait (768px) — 2-up bento mosaic. */
 export const Tablet: Story = {
   parameters: { viewport: { defaultViewport: 'bpLg' } },
   play: async ({ canvas }) => {
-    // Chart + donut both render (they share the second bento row side-by-side at lg).
     await expect(await canvas.findByText('Kategoriye göre ilanlar')).toBeInTheDocument();
-    await expect(canvas.getByText('Duruma göre dağılım')).toBeInTheDocument();
   },
 };
-/** Desktop (1024px) — full bento at 4-up: KPI 4-up, span-2 chart/pending tiles half width. */
+
+/** Desktop (1024px) — 4-up KPI band above a 2-up panel grid. */
 export const Desktop: Story = {
   parameters: { viewport: { defaultViewport: 'bpXl' } },
-  play: async ({ canvas, canvasElement }) => {
-    await expect(await canvas.findByText('Toplam İlan')).toBeInTheDocument();
-    // Sparklines render inside KPI tiles when a trend series is seeded (decorative,
-    // aria-hidden). Assert at least one sparkline slot is present.
-    await expect(canvasElement.querySelector('[data-slot="kpi-sparkline"]')).not.toBeNull();
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText('Toplam ilan')).toBeInTheDocument();
+    await expect(canvas.getByText('Kategoriye göre ilanlar')).toBeInTheDocument();
   },
 };
-/** Loading — real loading branch: shape-matched KPI bars + bar-chart/donut silhouettes. */
+
+/** Loading — shape-matched KPI bars + widget/chart skeletons. */
 export const Loading: Story = {
   render: () => render('loading'),
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-slot="chart-skeleton"]')).not.toBeNull();
-    await expect(canvasElement.querySelector('[data-slot="donut-skeleton"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-slot="widget-skeleton"]')).not.toBeNull();
   },
 };
-/** Empty — zero listings: empty charts + empty pending/decisions tiles. */
+
+/** Empty — zero listings: pending queue shows its empty state. */
 export const Empty: Story = {
   render: () => render('empty'),
   play: async ({ canvas }) => {
     await expect(await canvas.findByText('Bekleyen ilan yok')).toBeInTheDocument();
   },
 };
-/** Error — real `isError` branch: the whole bento is replaced by a retry ErrorState. */
+
+/** Error — a failed stats fetch replaces the whole board with a retry state. */
 export const Error: Story = {
   render: () => render('error'),
   play: async ({ canvas }) => {
     await expect(await canvas.findByRole('alert')).toBeInTheDocument();
     await expect(canvas.getByText('Panel yüklenemedi')).toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Tekrar dene' })).toBeInTheDocument();
+  },
+};
+
+/** Insights-only error — stats succeed but insights fail; the board still shows
+ *  the retry state instead of rendering confident zeroes. */
+export const InsightsError: Story = {
+  render: () => render('insights-error'),
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText('Panel yüklenemedi')).toBeInTheDocument();
   },
 };

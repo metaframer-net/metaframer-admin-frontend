@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Loader2, Monitor, ShieldCheck, ShieldOff } from 'lucide-react';
+import { KeyRound, Loader2, Monitor, ShieldCheck, ShieldOff } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,14 @@ import { useAuditFor } from '@/features/audit/api/queries';
 import { AuditTimeline } from '@/features/audit';
 import { ChangePasswordForm } from '../components/ChangePasswordForm';
 import { TwoFactorForm } from '../components/TwoFactorForm';
+import { RecoveryCodes } from '../components/RecoveryCodes';
 import {
   authErrorMessage,
   use2faSetup,
   useChangePassword,
   useDisable2fa,
   useEnable2fa,
+  useRegenerateRecoveryCodes,
   useRevokeOtherSessions,
   useRevokeSession,
   useSecurity,
@@ -42,7 +44,10 @@ export function AccountSecurityPage() {
   const revokeSession = useRevokeSession();
   const revokeOthers = useRevokeOtherSessions();
 
+  const regenerate = useRegenerateRecoveryCodes();
   const [enrollOpen, setEnrollOpen] = React.useState(false);
+  const [enrollCodes, setEnrollCodes] = React.useState<string[] | null>(null);
+  const [regenCodes, setRegenCodes] = React.useState<string[] | null>(null);
   const [disableOpen, setDisableOpen] = React.useState(false);
   const [revokeAllOpen, setRevokeAllOpen] = React.useState(false);
   const setup = use2faSetup(enrollOpen);
@@ -94,27 +99,51 @@ export function AccountSecurityPage() {
               Güvenlik bilgileri yüklenemedi.
             </p>
           ) : info.totpEnabled ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm">
-                <ShieldCheck className="text-success size-4" aria-hidden="true" />
-                <Badge variant="secondary">Etkin</Badge>
-                İki adımlı doğrulama açık.
-              </span>
-              <Button
-                variant="outline"
-                onClick={() => setDisableOpen(true)}
-                data-action="disable-2fa"
-                data-entity="auth"
-              >
-                <ShieldOff className="size-4" /> Kapat
-              </Button>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="flex items-center gap-2 text-sm">
+                  <ShieldCheck className="text-success size-4" aria-hidden="true" />
+                  <Badge variant="secondary">Etkin</Badge>
+                  İki adımlı doğrulama açık.
+                </span>
+                {info.totpRequired ? (
+                  <span className="text-muted-foreground text-xs">Rol politikası gereği zorunlu</span>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setDisableOpen(true)}
+                    data-action="disable-2fa"
+                    data-entity="auth"
+                  >
+                    <ShieldOff className="size-4" /> Kapat
+                  </Button>
+                )}
+              </div>
+              <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                <span className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <KeyRound className="size-4" aria-hidden="true" />
+                  {info.recoveryCodesRemaining} kurtarma kodu kaldı
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => regenerate.mutate(undefined, { onSuccess: (r) => setRegenCodes(r.codes) })}
+                  disabled={regenerate.isPending}
+                  data-action="regenerate-recovery-codes"
+                  data-entity="auth"
+                >
+                  Kurtarma kodlarını yenile
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-sm">
                 <ShieldOff className="text-muted-foreground size-4" aria-hidden="true" />
                 <Badge variant="outline">Kapalı</Badge>
-                Hesabınızı daha güvenli hale getirin.
+                {info.totpRequired
+                  ? 'Rol politikanız gereği açmanız gerekiyor.'
+                  : 'Hesabınızı daha güvenli hale getirin.'}
               </span>
               <Button onClick={() => setEnrollOpen(true)} data-action="enable-2fa" data-entity="auth">
                 <ShieldCheck className="size-4" /> Aç
@@ -204,30 +233,70 @@ export function AccountSecurityPage() {
         </CardContent>
       </Card>
 
-      {/* --- Enable 2FA dialog --- */}
-      <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
+      {/* --- Enable 2FA dialog (verify code → show recovery codes) --- */}
+      <Dialog
+        open={enrollOpen}
+        onOpenChange={(o) => {
+          setEnrollOpen(o);
+          if (!o) setEnrollCodes(null);
+        }}
+      >
+        <DialogContent>
+          {enrollCodes ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Kurtarma kodlarınız</DialogTitle>
+                <DialogDescription>
+                  Telefonunuza erişemezseniz giriş için bu kodları kullanın.
+                </DialogDescription>
+              </DialogHeader>
+              <RecoveryCodes
+                codes={enrollCodes}
+                doneLabel="Tamam"
+                onDone={() => {
+                  setEnrollOpen(false);
+                  setEnrollCodes(null);
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>İki adımlı doğrulamayı aç</DialogTitle>
+                <DialogDescription>
+                  Kimlik doğrulama uygulamanıza gizli anahtarı ekleyin, ardından ürettiği kodu girin.
+                </DialogDescription>
+              </DialogHeader>
+              {setup.data && (
+                <div className="border-border bg-muted mb-2 rounded-md border p-3 text-sm">
+                  <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+                    Gizli anahtar (demo)
+                  </p>
+                  <code className="font-mono break-all">{setup.data.secret}</code>
+                </div>
+              )}
+              <TwoFactorForm
+                onSubmit={(code) =>
+                  enable2fa.mutate(code, { onSuccess: (res) => setEnrollCodes(res.codes) })
+                }
+                pending={enable2fa.isPending}
+                errorMessage={enable2fa.isError ? authErrorMessage(enable2fa.error, 'Doğrulama kodu hatalı.') : null}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Regenerated recovery codes dialog --- */}
+      <Dialog open={regenCodes != null} onOpenChange={(o) => { if (!o) setRegenCodes(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>İki adımlı doğrulamayı aç</DialogTitle>
-            <DialogDescription>
-              Kimlik doğrulama uygulamanıza gizli anahtarı ekleyin, ardından ürettiği kodu girin.
-            </DialogDescription>
+            <DialogTitle>Yeni kurtarma kodları</DialogTitle>
+            <DialogDescription>Eski kodlar artık geçersiz. Bunları güvenle saklayın.</DialogDescription>
           </DialogHeader>
-          {setup.data && (
-            <div className="border-border bg-muted mb-2 rounded-md border p-3 text-sm">
-              <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
-                Gizli anahtar (demo)
-              </p>
-              <code className="font-mono break-all">{setup.data.secret}</code>
-            </div>
+          {regenCodes && (
+            <RecoveryCodes codes={regenCodes} doneLabel="Tamam" onDone={() => setRegenCodes(null)} />
           )}
-          <TwoFactorForm
-            onSubmit={(code) =>
-              enable2fa.mutate(code, { onSuccess: () => setEnrollOpen(false) })
-            }
-            pending={enable2fa.isPending}
-            errorMessage={enable2fa.isError ? authErrorMessage(enable2fa.error, 'Doğrulama kodu hatalı.') : null}
-          />
         </DialogContent>
       </Dialog>
 

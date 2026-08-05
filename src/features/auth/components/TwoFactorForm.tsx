@@ -6,25 +6,35 @@ import { Form } from '@/components/form/form-context';
 import { FormField } from '@/components/form/FormField';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { twoFactorSchema, type TwoFactorInput } from '../schemas/auth';
+import { twoFactorSchema, twoFactorOrRecoverySchema, type TwoFactorInput } from '../schemas/auth';
 
 export interface TwoFactorFormProps {
   onSubmit: (code: string) => void | Promise<void>;
   pending?: boolean;
   errorMessage?: string | null;
+  /** When true, also accepts a recovery code (used on the verify step). */
+  allowRecovery?: boolean;
+  /** Override the submit button label (e.g. "Kur ve devam et"). */
+  submitLabel?: string;
 }
 
-/** Presentational 2FA code entry (6-digit TOTP). Container-free for Storybook. */
-export function TwoFactorForm({ onSubmit, pending = false, errorMessage }: TwoFactorFormProps) {
+/** Presentational 2FA code entry (6-digit TOTP, optionally a recovery code). */
+export function TwoFactorForm({
+  onSubmit,
+  pending = false,
+  errorMessage,
+  allowRecovery = false,
+  submitLabel = 'Doğrula',
+}: TwoFactorFormProps) {
   const form = useForm<TwoFactorInput>({
-    resolver: zodResolver(twoFactorSchema),
+    resolver: zodResolver(allowRecovery ? twoFactorOrRecoverySchema : twoFactorSchema),
     defaultValues: { code: '' },
   });
 
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((v) => void onSubmit(v.code))}
+        onSubmit={form.handleSubmit((v) => void onSubmit(v.code.trim()))}
         noValidate
         className="grid gap-4"
       >
@@ -40,21 +50,37 @@ export function TwoFactorForm({ onSubmit, pending = false, errorMessage }: TwoFa
 
         <FormField
           name="code"
-          label="Doğrulama kodu"
-          help="Kimlik doğrulama uygulamanızdaki (Authenticator) 6 haneli kodu girin. Demo kodu: 123456."
+          label={allowRecovery ? 'Kod veya kurtarma kodu' : 'Doğrulama kodu'}
+          help={
+            allowRecovery
+              ? 'Authenticator uygulamanızdaki 6 haneli kodu ya da kurtarma kodlarınızdan birini girin. Demo kodu: 123456.'
+              : 'Kimlik doğrulama uygulamanızdaki (Authenticator) 6 haneli kodu girin. Demo kodu: 123456.'
+          }
           required
         >
-          <Input
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            autoFocus
-            maxLength={6}
-            placeholder="000000"
-            className="text-center text-lg tracking-[0.4em]"
-            disabled={pending}
-            data-action="fill-2fa-code"
-            data-entity="auth"
-          />
+          {allowRecovery ? (
+            <Input
+              autoComplete="one-time-code"
+              autoFocus
+              placeholder="000000 veya XXXX-XXXX"
+              className="text-center tracking-widest"
+              disabled={pending}
+              data-action="fill-2fa-code"
+              data-entity="auth"
+            />
+          ) : (
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              placeholder="000000"
+              className="text-center text-lg tracking-[0.4em]"
+              disabled={pending}
+              data-action="fill-2fa-code"
+              data-entity="auth"
+            />
+          )}
         </FormField>
 
         <Button
@@ -65,7 +91,7 @@ export function TwoFactorForm({ onSubmit, pending = false, errorMessage }: TwoFa
           data-action="submit-2fa"
           data-entity="auth"
         >
-          Doğrula
+          {submitLabel}
         </Button>
       </form>
     </Form>

@@ -34,6 +34,10 @@ export const loginResponseSchema = z.object({
   user: sessionUserSchema.optional(),
   requires2fa: z.boolean().optional(),
   challengeToken: z.string().optional(),
+  /** Set when the user's role REQUIRES 2FA but they have not enrolled yet →
+   *  the client routes to the mandatory enrollment step with `setupToken`. */
+  requires2faSetup: z.boolean().optional(),
+  setupToken: z.string().optional(),
 });
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
@@ -72,6 +76,14 @@ export const twoFactorSchema = z.object({
     .regex(/^\d{6}$/, '6 haneli kodu girin.'),
 });
 export type TwoFactorInput = z.infer<typeof twoFactorSchema>;
+
+/** Verify accepting a 6-digit code OR a recovery code (XXXX-XXXX). */
+export const twoFactorOrRecoverySchema = z.object({
+  code: z
+    .string()
+    .min(1, 'Doğrulama kodu gerekli.')
+    .regex(/^(\d{6}|[A-Za-z0-9]{4}-[A-Za-z0-9]{4})$/, 'Geçerli bir kod veya kurtarma kodu girin.'),
+});
 
 /** Details of a pending admin invite (resolved from an invite token). */
 export const inviteDetailsSchema = z.object({
@@ -120,7 +132,12 @@ export type ActiveSession = z.infer<typeof activeSessionSchema>;
 
 /** Snapshot for the account-security page. */
 export interface SecurityInfo {
+  /** Whether the current user has enrolled in 2FA. */
   totpEnabled: boolean;
+  /** Whether the current user's ROLE is required to use 2FA (policy). */
+  totpRequired: boolean;
+  /** Unused recovery codes left (0 when not enrolled). */
+  recoveryCodesRemaining: number;
   sessions: ActiveSession[];
 }
 
@@ -128,4 +145,39 @@ export interface SecurityInfo {
 export interface TwoFactorSetup {
   secret: string;
   otpauth: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 035 — 2FA realism & policy
+// ---------------------------------------------------------------------------
+
+/**
+ * Org-wide 2FA policy: which roles MUST use 2FA. Members of these roles are
+ * forced to enrol at login; everyone else may opt in. Editable by super-admin.
+ */
+export const twoFactorPolicySchema = z.object({
+  requiredRoles: z.array(roleEnum),
+});
+export type TwoFactorPolicy = z.infer<typeof twoFactorPolicySchema>;
+
+/** Response after enrolling in 2FA — the one-time recovery codes. */
+export interface RecoveryCodes {
+  codes: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Phase 037 — organizations / tenant switcher
+// ---------------------------------------------------------------------------
+
+/** A tenant/organization the signed-in admin can operate in. */
+export const organizationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type Organization = z.infer<typeof organizationSchema>;
+
+/** The current user's organizations + which one is active. */
+export interface OrganizationsResponse {
+  organizations: Organization[];
+  activeOrgId: string;
 }

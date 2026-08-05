@@ -56,13 +56,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvas }) => {
     // The floating launcher is the visible affordance.
-    await expect(canvas.getByRole('button', { name: 'AI asistanını aç' })).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: /ask ai/i })).toBeInTheDocument();
   },
 };
 
 export const Open: Story = {
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: 'AI asistanını aç' }));
+    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     // Sheet content is portaled to document.body.
     await expect(await screen.findByRole('dialog')).toBeInTheDocument();
     await expect(screen.getByText('AI Asistanı')).toBeInTheDocument();
@@ -92,7 +92,7 @@ export const Loading: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: 'AI asistanını aç' }));
+    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     await expect(await screen.findByText('Moderasyon kopilotu')).toBeInTheDocument();
   },
 };
@@ -120,7 +120,7 @@ export const Empty: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: 'AI asistanını aç' }));
+    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     await expect(await screen.findByText('Onay bekleyen AI-OK ilan yok.')).toBeInTheDocument();
   },
 };
@@ -149,7 +149,7 @@ export const Error: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: 'AI asistanını aç' }));
+    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     await expect(await screen.findByText('Kuyruk alınamadı')).toBeInTheDocument();
   },
 };
@@ -157,7 +157,7 @@ export const Error: Story = {
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: 'AI asistanını aç' }));
+    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     await expect(await screen.findByRole('dialog')).toBeInTheDocument();
   },
 };

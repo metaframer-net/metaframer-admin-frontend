@@ -1,9 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { AuthProvider, type AuthStatus, type SessionUser } from '@/lib/auth/auth-context';
+import { clearSessionExpired, markSessionExpired } from '@/lib/api/auth-token';
 import { AuthGate } from './AuthGate';
+
+afterEach(() => clearSessionExpired());
 
 const USER: SessionUser = {
   id: 'u-1',
@@ -17,6 +20,7 @@ function renderGate(status: AuthStatus, user: SessionUser | null) {
     [
       { path: '/app', element: <AuthGate><div>KORUMALI İÇERİK</div></AuthGate> },
       { path: '/login', element: <div>GİRİŞ SAYFASI</div> },
+      { path: '/session-expired', element: <div>OTURUM SÜRESİ DOLDU</div> },
     ],
     { initialEntries: ['/app'] },
   );
@@ -32,6 +36,13 @@ describe('AuthGate (authentication gate)', () => {
     renderGate('unauthenticated', null);
     expect(screen.getByText('GİRİŞ SAYFASI')).toBeInTheDocument();
     expect(screen.queryByText('KORUMALI İÇERİK')).not.toBeInTheDocument();
+  });
+
+  it('routes an expired session to /session-expired', () => {
+    markSessionExpired();
+    renderGate('unauthenticated', null);
+    expect(screen.getByText('OTURUM SÜRESİ DOLDU')).toBeInTheDocument();
+    expect(screen.queryByText('GİRİŞ SAYFASI')).not.toBeInTheDocument();
   });
 
   it('renders the protected tree when authenticated', () => {

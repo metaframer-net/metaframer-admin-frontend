@@ -27,10 +27,43 @@ export function usePermittedNav(): NavItem[] {
   return useMemo(() => filterNavByRole(navSchema, user.role, matrix), [user.role, matrix]);
 }
 
-/** Whether a nav item is active for the current pathname. */
+/** Whether a nav item is active for the current pathname (self or descendant route). */
 export function isNavItemActive(to: string, pathname: string): boolean {
   if (to === '/') return pathname === '/';
   return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+/**
+ * The id of the single "current" navigable item for `pathname` — the leaf whose
+ * `to` is the LONGEST prefix match. Only leaves (items without children) can be
+ * current; group headers are toggles, never the highlighted page. This is what
+ * fixes the double-active bug: on `/listings/moderation` only "Moderasyon
+ * Kuyruğu" wins, not its parent "İlanlar" (and not sibling "Tüm İlanlar").
+ */
+export function findActiveItemId(items: NavItem[], pathname: string): string | null {
+  let bestId: string | null = null;
+  let bestLen = -1;
+  const walk = (list: NavItem[]) => {
+    for (const it of list) {
+      if (!it.children && isNavItemActive(it.to, pathname) && it.to.length > bestLen) {
+        bestId = it.id;
+        bestLen = it.to.length;
+      }
+      if (it.children) walk(it.children);
+    }
+  };
+  walk(items);
+  return bestId;
+}
+
+/** The id of the top-level group that contains the active leaf, or `null`. */
+export function findActiveGroupId(items: NavItem[], pathname: string): string | null {
+  const activeId = findActiveItemId(items, pathname);
+  if (!activeId) return null;
+  for (const item of items) {
+    if (item.children?.some((c) => c.id === activeId)) return item.id;
+  }
+  return null;
 }
 
 /** Primary items for the mobile bottom nav (<=5). */

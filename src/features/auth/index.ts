@@ -1,9 +1,16 @@
 export { LoginPage } from './pages/LoginPage';
 export { TwoFactorPage } from './pages/TwoFactorPage';
+export { TwoFactorSetupPage } from './pages/TwoFactorSetupPage';
 export { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 export { ResetPasswordPage } from './pages/ResetPasswordPage';
 export { AcceptInvitePage } from './pages/AcceptInvitePage';
 export { AccountSecurityPage } from './pages/AccountSecurityPage';
+export { SessionExpiredPage } from './pages/SessionExpiredPage';
+export { AccountDisabledPage } from './pages/AccountDisabledPage';
+export { AuthErrorPage } from './pages/AuthErrorPage';
+export { UnauthorizedPage } from './pages/UnauthorizedPage';
+export { SelectOrganizationPage } from './pages/SelectOrganizationPage';
 export { AuthGate } from './components/AuthGate';
 export { SessionGuard } from './components/SessionGuard';
+export { OrgSwitcher } from './components/OrgSwitcher';
 export { LoginForm } from './components/LoginForm';
