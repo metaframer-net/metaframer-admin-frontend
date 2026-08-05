@@ -53,3 +53,9 @@ export const Cards: Story = {
     await expect(within(dialog).getByText('AI hazır')).toBeInTheDocument();
   },
 };
+
+/** List variant rendered at a narrow mobile viewport (360 px). */
+export const Mobile: Story = {
+  args: { variant: 'list' },
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+};

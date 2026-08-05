@@ -42,7 +42,7 @@ export function ReportsPage() {
     <div className="space-y-6" data-entity="report">
       <header className="animate-fade-in flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Raporlar & Analitik</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Raporlar & Analitik</h1>
           <p className="text-muted-foreground text-sm">
             Pazaryeri metrikleri — mevcut verilerden türetilmiş, salt-okunur.
           </p>

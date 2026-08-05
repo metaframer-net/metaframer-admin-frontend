@@ -69,7 +69,7 @@ export function ListingDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-2xl font-semibold tabular-nums">{listing.price.toLocaleString('tr-TR')} ₺</p>
+          <p className="text-xl font-semibold tabular-nums sm:text-2xl">{listing.price.toLocaleString('tr-TR')} ₺</p>
           <p className="text-muted-foreground text-sm">{listing.description}</p>
 
           <Separator />

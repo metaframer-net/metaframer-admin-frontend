@@ -58,7 +58,7 @@ export function PaymentsListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Ödemeler &amp; Faturalar</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Ödemeler &amp; Faturalar</h1>
           <p className="text-muted-foreground text-sm">
             Doping satın alma ödemeleri ve faturaları; satır seçip iade için detaya gidin.
           </p>
@@ -89,7 +89,7 @@ export function PaymentsListPage() {
           }
           renderSubRow={(row) => (
           <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 xl:grid-cols-4">
               <Detail label="Fatura No" value={row.invoiceNo} />
               <Detail label="Kullanıcı" value={row.userName} />
               <Detail label="Paket" value={row.packageName} />

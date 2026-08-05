@@ -28,7 +28,7 @@ export function ModerationQueuePage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <header className="animate-fade-in">
-        <h1 className="text-2xl font-semibold">Moderasyon Kuyruğu</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Moderasyon Kuyruğu</h1>
         <p className="text-muted-foreground text-sm">
           AI ön değerlendirme yapar; siz OK / Belirsiz / NOK olarak karar verirsiniz. Her karar denetim kaydına yazılır.
         </p>

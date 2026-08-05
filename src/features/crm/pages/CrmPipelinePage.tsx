@@ -118,7 +118,7 @@ export function CrmPipelinePage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-2xl font-semibold">Pipeline Raporları</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Pipeline Raporları</h1>
         <p className="text-muted-foreground text-sm">Satış hunisi, aşama geliri ve dönüşüm analizi.</p>
       </header>
 

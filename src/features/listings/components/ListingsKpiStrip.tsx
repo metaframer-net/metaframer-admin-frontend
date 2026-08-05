@@ -46,7 +46,7 @@ export function ListingsKpiStrip({ stats, isLoading = false }: ListingsKpiStripP
               <Icon className="size-3.5" aria-hidden="true" />
               {tile.label}
             </dt>
-            <dd className={cn('mt-1 font-mono text-2xl font-semibold tabular-nums', TONE[tile.tone])}>
+            <dd className={cn('mt-1 font-mono text-xl font-semibold tabular-nums sm:text-2xl', TONE[tile.tone])}>
               {isLoading || !stats ? (
                 <Skeleton className="h-7 w-12" />
               ) : (

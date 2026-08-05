@@ -66,7 +66,7 @@ export function UsersListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Kullanıcılar &amp; Ofisler</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Kullanıcılar &amp; Ofisler</h1>
           <p className="text-muted-foreground text-sm">Bireysel kullanıcılar, danışmanlar ve emlak ofisleri; doğrulama, askı ve güven skoru.</p>
         </div>
         <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={USER_VIEWS} entity="user" />
@@ -92,7 +92,7 @@ export function UsersListPage() {
             />
           }
           renderSubRow={(row) => (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm xl:grid-cols-4">
             <Detail label="Kullanıcı No" value={row.id} />
             <Detail label="E-posta" value={row.email} />
             <Detail label="Telefon" value={row.phone} />

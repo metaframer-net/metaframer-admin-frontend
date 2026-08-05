@@ -125,7 +125,7 @@ export function AttributeFormDialog({ attribute, existing, onSubmit, trigger }: 
               <Input placeholder="grossArea" data-action="edit-field" data-entity="attribute" />
             </FormField>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField name="type" label="Tip" help="Alanın veri tipi; Seçim tipinde seçenek listesi tanımlarsınız.">
                 {(f) => (
                   <Select value={(f.value as string) || 'text'} onValueChange={f.onChange}>

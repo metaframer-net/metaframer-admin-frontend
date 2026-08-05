@@ -54,7 +54,7 @@ export function OfficesListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Emlak Ofisleri</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Emlak Ofisleri</h1>
           <p className="text-muted-foreground text-sm">Kayıtlı emlak ofisleri; belge doğrulaması, askı ve güven skoru.</p>
         </div>
         <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={OFFICE_VIEWS} entity="office" />
@@ -74,7 +74,7 @@ export function OfficesListPage() {
             <FilterBar tableKey="offices" filters={officeFilters} state={state} searchPlaceholder="Ofis unvanı ara…" />
           }
           renderSubRow={(row) => (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm xl:grid-cols-4">
             <Detail label="Kullanıcı No" value={row.id} />
             <Detail label="E-posta" value={row.email} />
             <Detail label="Telefon" value={row.phone} />

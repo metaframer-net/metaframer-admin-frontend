@@ -84,7 +84,7 @@ export function CategoriesListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Kategoriler &amp; Nitelikler</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Kategoriler &amp; Nitelikler</h1>
           <p className="text-muted-foreground text-sm">
             Emlak taksonomisi ve her kategoriye bağlı dinamik nitelik setleri. İlan formu bu tek kaynaktan beslenir.
           </p>
