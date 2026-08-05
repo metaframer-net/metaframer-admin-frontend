@@ -138,13 +138,10 @@ export function CommandDock({ now, className }: CommandDockProps) {
   // Scroll-lock the page behind the open panel; both values are restored exactly.
   useEffect(() => {
     if (!panelOpen) return;
-    const body = document.body.style.overflow;
-    const root = document.documentElement.style.overflow;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = body;
-      document.documentElement.style.overflow = root;
+      document.body.style.overflow = prev;
     };
   }, [panelOpen]);
 

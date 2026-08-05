@@ -54,7 +54,9 @@ export function AppShell({ children }: AppShellProps) {
             floating command pill + the (bottom/left/right) edge docks + ⌘K launcher
             carry navigation, so the bottom bar is intentionally omitted. */}
         {effectiveMode !== 'dock' && <MobileBottomNav />}
-        <CommandLauncher variant={effectiveMode === 'dock' ? 'cards' : 'list'} />
+        {/* In dock mode the mobile pill expands inline (DockShell), so only
+            sidebar/topnav need the external CommandLauncher. */}
+        {effectiveMode !== 'dock' && <CommandLauncher variant="list" />}
         <AssistantDock />
         <SessionGuard />
       </div>
