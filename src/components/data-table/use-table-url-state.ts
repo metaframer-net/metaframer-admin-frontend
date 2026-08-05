@@ -32,6 +32,8 @@ export interface TableUrlState {
   setSorting: (updater: SortingState | ((prev: SortingState) => SortingState)) => void;
   setQuery: (q: string) => void;
   setFilter: (key: string, value: string | string[] | null) => void;
+  /** Set multiple filters atomically in one URL update. */
+  setFilters: (entries: Record<string, string | string[] | null>) => void;
   clearFilter: (key: string) => void;
   clearAll: () => void;
   setView: (view: string | null) => void;
@@ -135,6 +137,20 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
     [mutate],
   );
 
+  /** Set multiple filters in a single URL update (prevents race conditions). */
+  const setFilters = useCallback(
+    (entries: Record<string, string | string[] | null>) =>
+      mutate((p) => {
+        for (const [key, value] of Object.entries(entries)) {
+          p.delete(key);
+          if (Array.isArray(value)) value.forEach((v) => v && p.append(key, v));
+          else if (value) p.set(key, value);
+        }
+        p.set('page', '1');
+      }),
+    [mutate],
+  );
+
   const clearFilter = useCallback((key: string) => setFilter(key, null), [setFilter]);
 
   const clearAll = useCallback(
@@ -188,6 +204,7 @@ export function useTableUrlState(options: UseTableUrlStateOptions = {}): TableUr
     setSorting,
     setQuery,
     setFilter,
+    setFilters,
     clearFilter,
     clearAll,
     setView,

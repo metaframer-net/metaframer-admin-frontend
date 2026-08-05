@@ -4,13 +4,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { DataKanban, type KanbanColumn } from '@/components/data-table/DataKanban';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
 import { Can } from '@/lib/permissions/permission-context';
 import { LOCATIONS } from '@/features/listings/data/taxonomy';
-import { USER_STATUS_LABELS, USER_TYPE_LABELS } from '../data/users';
+import { USER_STATUS_LABELS, USER_STATUSES, USER_TYPE_LABELS } from '../data/users';
 import { userFilters } from '../data/filters';
 import { userColumns } from '../components/userColumns';
 import { UserStatusBadge } from '../components/UserStatusBadge';
@@ -36,9 +42,25 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const USER_VIEWS = ['table', 'kanban', 'gallery'] as const satisfies readonly DataView[];
+
+const STATUS_DOT: Record<User['status'], string> = {
+  active: 'bg-success',
+  pending: 'bg-warning',
+  suspended: 'bg-chart-4',
+  banned: 'bg-destructive',
+};
+
+const KANBAN_COLUMNS: KanbanColumn<User['status']>[] = USER_STATUSES.map((s) => ({
+  key: s,
+  label: USER_STATUS_LABELS[s],
+  dot: STATUS_DOT[s],
+}));
+
 export function UsersListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
   const { data, isLoading, isError, refetch } = useUsers(state.query);
+  const view = parseDataView(state.view, USER_VIEWS);
 
   return (
     <div className="space-y-4">
@@ -47,27 +69,29 @@ export function UsersListPage() {
           <h1 className="text-2xl font-semibold">Kullanıcılar &amp; Ofisler</h1>
           <p className="text-muted-foreground text-sm">Bireysel kullanıcılar, danışmanlar ve emlak ofisleri; doğrulama, askı ve güven skoru.</p>
         </div>
+        <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={USER_VIEWS} entity="user" />
       </header>
 
-      <DataTable
-        columns={userColumns}
-        data={data?.items ?? []}
-        total={data?.total ?? 0}
-        state={state}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        filterBar={
-          <FilterBar
-            tableKey="users"
-            filters={userFilters}
-            state={state}
-            searchPlaceholder="Ad veya e-posta ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        renderSubRow={(row) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={userColumns}
+          data={data?.items ?? []}
+          total={data?.total ?? 0}
+          state={state}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          filterBar={
+            <FilterBar
+              tableKey="users"
+              filters={userFilters}
+              state={state}
+              searchPlaceholder="Ad veya e-posta ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          renderSubRow={(row) => (
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
             <Detail label="Kullanıcı No" value={row.id} />
             <Detail label="E-posta" value={row.email} />
@@ -134,6 +158,77 @@ export function UsersListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="users"
+            filters={userFilters}
+            state={state}
+            searchPlaceholder="Ad veya e-posta ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Kullanıcılar yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'kanban' ? (
+            <DataKanban
+              data={data?.items ?? []}
+              columns={KANBAN_COLUMNS}
+              getStatus={(u) => u.status}
+              getKey={(u) => u.id}
+              entity="user"
+              renderCard={(u) => (
+                <div className="bg-card hover:border-primary/40 rounded-lg border border-border p-3 shadow-xs transition-colors">
+                  <p className="text-sm font-semibold">{u.name}</p>
+                  <p className="text-muted-foreground mt-1 text-xs">{USER_TYPE_LABELS[u.type]}</p>
+                  <div className="text-muted-foreground mt-1 text-xs">{u.email}</div>
+                  <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                    <span className="tabular-nums">{u.listingsCount} ilan</span>
+                    <TrustScoreMeter score={u.trustScore} compact />
+                  </div>
+                </div>
+              )}
+            />
+          ) : (
+            <DataGallery
+              data={data?.items ?? []}
+              getKey={(u) => u.id}
+              renderCard={(u) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="from-primary/20 to-accent/20 flex aspect-[16/7] items-center justify-center bg-gradient-to-br">
+                    <span className="text-foreground/50 text-3xl font-bold">{u.name.split(' ').map((n) => n[0]).join('')}</span>
+                  </div>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="truncate text-sm font-semibold">{u.name}</h3>
+                      <UserStatusBadge status={u.status} />
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">{USER_TYPE_LABELS[u.type]}</p>
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">{u.email}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="tabular-nums">{u.listingsCount} ilan</span>
+                      <TrustScoreMeter score={u.trustScore} compact />
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,12 @@ export interface FilterConfig {
   unit?: string;
   /** Allow multiple selections (faceted). */
   multiple?: boolean;
+  /** Slider lower bound for numberRange — enables dual-thumb slider when set with sliderMax. */
+  sliderMin?: number | undefined;
+  /** Slider upper bound for numberRange. */
+  sliderMax?: number | undefined;
+  /** Slider step size (default 1). */
+  sliderStep?: number | undefined;
 }
 
 /** A named preset of filters + sort + column visibility. */

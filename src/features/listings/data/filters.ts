@@ -45,7 +45,7 @@ export const ilFilter: FilterConfig = {
   multiple: false,
   options: ilOptions(),
 };
-export const priceFilter: FilterConfig = { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺' };
+export const priceFilter: FilterConfig = { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺', sliderMin: 0, sliderMax: 10_000_000, sliderStep: 50_000 };
 
 /** Toolbar FilterBar order. */
 export const listingFilters: FilterConfig[] = [statusFilter, categoryFilter, aiFilter, ilFilter, priceFilter];

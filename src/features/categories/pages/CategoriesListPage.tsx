@@ -6,13 +6,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { DataKanban, type KanbanColumn } from '@/components/data-table/DataKanban';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api } from '@/lib/api/client';
 import { Can } from '@/lib/permissions/permission-context';
-import { CATEGORY_STATUS_LABELS } from '../data/categories';
+import { CATEGORY_STATUS_LABELS, CATEGORY_STATUSES } from '../data/categories';
 import { categoryFilters } from '../data/filters';
 import { categoryColumns, type CategoryTableMeta } from '../components/categoryColumns';
 import { CategoryStatusBadge } from '../components/CategoryStatusBadge';
@@ -29,8 +35,22 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const STATUS_DOT: Record<Category['status'], string> = {
+  active: 'bg-success',
+  archived: 'bg-muted-foreground',
+};
+
+const KANBAN_COLUMNS: KanbanColumn<Category['status']>[] = CATEGORY_STATUSES.map((s) => ({
+  key: s,
+  label: CATEGORY_STATUS_LABELS[s],
+  dot: STATUS_DOT[s],
+}));
+
+const CATEGORY_VIEWS = ['table', 'kanban', 'gallery'] as const satisfies readonly DataView[];
+
 export function CategoriesListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
+  const view = parseDataView(state.view, CATEGORY_VIEWS);
   const { data, isLoading, isError, refetch } = useCategories(state.query);
   const upsert = useUpsertCategory();
   const reorder = useReorderCategories(state.query);
@@ -69,38 +89,42 @@ export function CategoriesListPage() {
             Emlak taksonomisi ve her kategoriye bağlı dinamik nitelik setleri. İlan formu bu tek kaynaktan beslenir.
           </p>
         </div>
-        <Can permission="category.manage">
-          <CategoryFormDialog
-            onSubmit={async (values) => {
-              const created = await upsert.mutateAsync({ values });
-              navigate(`/categories/${created.id}`);
-            }}
-          />
-        </Can>
+        <div className="flex items-center gap-2">
+          <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={CATEGORY_VIEWS} entity="category" />
+          <Can permission="category.manage">
+            <CategoryFormDialog
+              onSubmit={async (values) => {
+                const created = await upsert.mutateAsync({ values });
+                navigate(`/categories/${created.id}`);
+              }}
+            />
+          </Can>
+        </div>
       </header>
 
-      <DataTable
-        columns={categoryColumns}
-        data={ordered}
-        total={data?.total ?? 0}
-        state={state}
-        meta={meta}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        emptyTitle="Kategori bulunamadı"
-        emptyDescription="Filtreleri değiştirin ya da yeni bir kategori oluşturun."
-        filterBar={
-          <FilterBar
-            tableKey="categories"
-            filters={categoryFilters}
-            state={state}
-            searchPlaceholder="Kategori adı veya anahtar ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        bulkActions={(ids, _all, clear) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={categoryColumns}
+          data={ordered}
+          total={data?.total ?? 0}
+          state={state}
+          meta={meta}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          emptyTitle="Kategori bulunamadı"
+          emptyDescription="Filtreleri değiştirin ya da yeni bir kategori oluşturun."
+          filterBar={
+            <FilterBar
+              tableKey="categories"
+              filters={categoryFilters}
+              state={state}
+              searchPlaceholder="Kategori adı veya anahtar ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          bulkActions={(ids, _all, clear) => (
           <BulkCategoryActions
             categories={ordered.filter((c) => ids.includes(c.id))}
             clear={clear}
@@ -153,6 +177,79 @@ export function CategoriesListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="categories"
+            filters={categoryFilters}
+            state={state}
+            searchPlaceholder="Kategori adı veya anahtar ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Kategoriler yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'kanban' ? (
+            <DataKanban
+              data={ordered}
+              columns={KANBAN_COLUMNS}
+              getStatus={(c) => c.status}
+              getKey={(c) => c.id}
+              entity="category"
+              renderCard={(c) => (
+                <div className="bg-card hover:border-primary/40 rounded-lg border border-border p-3 shadow-xs transition-colors">
+                  <p className="text-sm font-semibold">{c.label}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    <code>{c.key}</code>
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs tabular-nums">{c.attributes.length} nitelik</p>
+                  {c.description && (
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{c.description}</p>
+                  )}
+                </div>
+              )}
+            />
+          ) : (
+            <DataGallery
+              data={ordered}
+              getKey={(c) => c.id}
+              renderCard={(c) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="truncate text-sm font-semibold">{c.label}</h3>
+                      <CategoryStatusBadge status={c.status} />
+                    </div>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      <code>{c.key}</code>
+                    </p>
+                    {c.description && (
+                      <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{c.description}</p>
+                    )}
+                    <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                      <span className="text-muted-foreground tabular-nums">{c.attributes.length} nitelik</span>
+                      <span className="text-muted-foreground tabular-nums">Sıra: {c.order + 1}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

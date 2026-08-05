@@ -40,6 +40,9 @@ export const revenueFilter: FilterConfig = {
   label: 'Toplam Gelir',
   kind: 'numberRange',
   unit: '₺',
+  sliderMin: 0,
+  sliderMax: 500_000,
+  sliderStep: 10_000,
 };
 
 export const contactFilters: FilterConfig[] = [
@@ -72,6 +75,9 @@ export const leadValueFilter: FilterConfig = {
   label: 'Değer',
   kind: 'numberRange',
   unit: '₺',
+  sliderMin: 0,
+  sliderMax: 200_000,
+  sliderStep: 5_000,
 };
 
 export const leadFilters: FilterConfig[] = [

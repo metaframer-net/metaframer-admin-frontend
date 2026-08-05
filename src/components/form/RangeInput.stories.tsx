@@ -30,6 +30,9 @@ export const Default: Story = {
     await expect(min).toHaveValue('1.500.000');
   },
 };
+export const WithSlider: Story = {
+  render: () => <Harness unit="₺" sliderMin={0} sliderMax={10_000_000} sliderStep={50_000} />,
+};
 export const AreaMeters: Story = { render: () => <Harness unit="m²" minPlaceholder="En az" maxPlaceholder="En çok" /> };
 export const Loading: Story = { render: () => <Harness disabled unit="₺" /> };
 export const Empty: Story = { render: () => <Harness unit="₺" /> };
