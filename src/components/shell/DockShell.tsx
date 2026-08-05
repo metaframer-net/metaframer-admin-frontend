@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMatches } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
@@ -46,6 +46,17 @@ export function DockShell({ children, now }: DockShellProps) {
   }
 
   const closeRef = useRef<HTMLButtonElement>(null);
+  // backdrop-filter is expensive during clip-path animation. Enable it
+  // only after the 480ms morph settles — `data-settled` drives the CSS.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      setSettled(false);
+      return;
+    }
+    const id = setTimeout(() => setSettled(true), 500);
+    return () => clearTimeout(id);
+  }, [open]);
 
   // Deferred focus — two rAFs so the clip-path animation paints first.
   useEffect(() => {
@@ -100,7 +111,8 @@ export function DockShell({ children, now }: DockShellProps) {
           Collapsed: clips to a 3.5rem pill at the top with round corners.
           Expanded:  clips to the full rectangle with 1.5rem radius. */}
       <div
-        className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border backdrop-blur-md xl:hidden"
+        className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border xl:hidden"
+        data-settled={settled ? 'true' : undefined}
         style={{
           clipPath: open
             ? 'inset(0 0 0 0 round 1.5rem)'

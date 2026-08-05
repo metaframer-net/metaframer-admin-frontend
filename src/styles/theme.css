@@ -662,10 +662,22 @@
   .dock-island {
     transition: clip-path 480ms cubic-bezier(0.32, 0.72, 0, 1);
     will-change: clip-path;
+    /* backdrop-filter is killed during the clip-path morph because the
+       browser must re-blur the newly-revealed region on every frame,
+       which defeats GPU compositing. The filter fades in AFTER the
+       clip settles (480ms delay + 200ms fade). */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
-  /* While the island is clipped to pill shape, suppress the pc-stack
-     height transition so it never fights the clip-path GPU animation.
-     The selector targets the collapsed state (clip includes calc). */
+  .dock-island[data-settled='true'] {
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    transition: clip-path 480ms cubic-bezier(0.32, 0.72, 0, 1),
+                backdrop-filter 200ms ease 0ms,
+                -webkit-backdrop-filter 200ms ease 0ms;
+  }
+  /* Suppress pc-stack height transition inside the island so the
+     layout-bound height animation never fights clip-path. */
   .dock-island .pc-stack {
     transition: none;
   }
