@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import {
   Sheet,
   SheetContent,
@@ -7,6 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useCommandPalette } from '@/components/shell/command-palette-context';
 import { useAssistant } from '@/lib/ai';
 import { AiAskButton } from './AiAskButton';
 import { AssistantPanel } from './AssistantPanel';
@@ -19,6 +21,11 @@ import { AssistantPanel } from './AssistantPanel';
  */
 export function AssistantDock() {
   const { open, setOpen } = useAssistant();
+  // Hide the floating launcher while the command center is open: both live at
+  // z-40, so on mobile (dock-island) the orb would otherwise paint ON TOP of the
+  // open panel, and on desktop it would float over the command backdrop. It fades
+  // back in on close.
+  const { open: commandOpen } = useCommandPalette();
 
   return (
     <>
@@ -26,7 +33,13 @@ export function AssistantDock() {
           for its own absolutely-positioned glass layers, so it must not carry the
           `fixed` utility itself (the component's own CSS would win the cascade and
           drop it back into normal flow, shifting it and breaking sibling sticky). */}
-      <div className="fixed bottom-20 right-4 z-40 xl:bottom-6">
+      <div
+        className={cn(
+          'fixed bottom-20 right-4 z-40 transition-opacity duration-200 xl:bottom-6',
+          commandOpen ? 'pointer-events-none opacity-0' : 'opacity-100',
+        )}
+        {...(commandOpen ? { inert: true, 'aria-hidden': true } : {})}
+      >
         <AiAskButton onClick={() => setOpen(true)} />
       </div>
 

@@ -7,6 +7,7 @@ import { expect, screen, userEvent } from 'storybook/test';
 import { listingKeys } from '@/features/listings/api/queries';
 import type { Listing } from '@/features/listings';
 import { resetAssistant } from '@/lib/ai';
+import { CommandPaletteProvider } from '@/components/shell/command-palette-context';
 import { AssistantDock } from './AssistantDock';
 import { AI_QUEUE_QUERY } from './assistant-context';
 
@@ -19,6 +20,17 @@ const QUEUE: Listing[] = [
   },
 ];
 
+/**
+ * In the app AssistantDock always lives inside CommandPaletteProvider (AppShell),
+ * which it reads to hide the launcher while the command center is open. Every
+ * story mounts it through this wrapper so that context is present.
+ */
+const Dock = () => (
+  <CommandPaletteProvider>
+    <AssistantDock />
+  </CommandPaletteProvider>
+);
+
 function renderDock(): ReactElement {
   const qc = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false, retryOnMount: false } },
@@ -28,7 +40,7 @@ function renderDock(): ReactElement {
     [
       {
         path: '/listings',
-        element: <AssistantDock />,
+        element: <Dock />,
         handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
       },
       { path: '*', element: <div /> },
@@ -79,7 +91,7 @@ export const Loading: Story = {
       [
         {
           path: '/listings',
-          element: <AssistantDock />,
+          element: <Dock />,
           handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
         },
       ],
@@ -107,7 +119,7 @@ export const Empty: Story = {
       [
         {
           path: '/listings',
-          element: <AssistantDock />,
+          element: <Dock />,
           handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
         },
       ],
@@ -136,7 +148,7 @@ export const Error: Story = {
       [
         {
           path: '/listings',
-          element: <AssistantDock />,
+          element: <Dock />,
           handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
         },
       ],
@@ -159,5 +171,46 @@ export const Mobile: Story = {
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
     await expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  },
+};
+
+/**
+ * With the command center open (mobile dock-island / desktop backdrop both at
+ * z-40), the floating launcher must NOT paint over it — it fades out and goes
+ * inert/aria-hidden so it neither overlaps nor traps focus. Regression for the
+ * mobile "Ask AI orb overlaps the open panel" bug.
+ */
+export const HiddenWhenCommandCenterOpen: Story = {
+  render: () => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false, retryOnMount: false } },
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/listings',
+          element: (
+            <CommandPaletteProvider defaultOpen>
+              <AssistantDock />
+            </CommandPaletteProvider>
+          ),
+          handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
+        },
+      ],
+      { initialEntries: ['/listings'] },
+    );
+    return (
+      <QueryClientProvider client={qc}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+  },
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  play: async ({ canvas }) => {
+    // aria-hidden removes it from the tree, so query it as a hidden element.
+    const btn = canvas.getByRole('button', { name: /ask ai/i, hidden: true });
+    const wrap = btn.closest('.fixed');
+    await expect(wrap).toHaveClass(/opacity-0/);
+    await expect(wrap).toHaveAttribute('inert');
   },
 };

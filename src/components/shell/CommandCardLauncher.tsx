@@ -46,7 +46,14 @@ export function CommandCardLauncher() {
             İzinli modüllere geçin, komut arayın veya doğal dille bir eylem önerin.
           </DialogDescription>
         </DialogHeader>
-        <CommandCenter onClose={() => setOpen(false)} contextEntity={contextEntity} />
+        {/* `min-h-0 flex-1` binds the body to the dialog's bounded height (like the
+            DockShell host does) so CommandCenter's inner `overflow-y-auto` actually
+            scrolls instead of forcing the surface past the viewport. */}
+        <CommandCenter
+          onClose={() => setOpen(false)}
+          contextEntity={contextEntity}
+          className="min-h-0 flex-1"
+        />
       </DialogContent>
     </Dialog>
   );
