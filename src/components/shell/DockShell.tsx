@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useMatches } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
@@ -46,6 +46,33 @@ export function DockShell({ children, now }: DockShellProps) {
   }
 
   const closeRef = useRef<HTMLButtonElement>(null);
+  const islandRef = useRef<HTMLDivElement>(null);
+
+  // will-change: promote layer BEFORE paint, demote after transition ends.
+  // useLayoutEffect runs synchronously before the browser paints the frame
+  // that starts the clip-path transition, so the layer is already promoted.
+  useLayoutEffect(() => {
+    const el = islandRef.current;
+    if (!el) return;
+    el.style.willChange = 'clip-path';
+    const demote = (e: TransitionEvent) => {
+      if (e.propertyName === 'clip-path') el.style.willChange = 'auto';
+    };
+    el.addEventListener('transitionend', demote);
+    return () => el.removeEventListener('transitionend', demote);
+  }, [open]);
+
+  // Scroll-lock — useLayoutEffect so the overflow change is batched into
+  // the same synchronous pre-paint phase as the DOM update. `contain` on
+  // the island prevents body reflow from touching the clip-path animation.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   // Deferred focus — two rAFs so the clip-path animation paints first.
   useEffect(() => {
@@ -54,20 +81,6 @@ export function DockShell({ children, now }: DockShellProps) {
       requestAnimationFrame(() => closeRef.current?.focus());
     });
     return () => cancelAnimationFrame(id);
-  }, [open]);
-
-  // Deferred scroll-lock — one rAF so overflow:hidden reflow doesn't
-  // collide with the clip-path transition's first frame.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    const id = requestAnimationFrame(() => {
-      document.body.style.overflow = 'hidden';
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      document.body.style.overflow = prev;
-    };
   }, [open]);
 
   // Escape to close.
@@ -100,12 +113,14 @@ export function DockShell({ children, now }: DockShellProps) {
           Collapsed: clips to a 3.5rem pill at the top with round corners.
           Expanded:  clips to the full rectangle with 1.5rem radius. */}
       <div
-        className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border backdrop-blur-md xl:hidden"
-        style={{
-          clipPath: open
-            ? 'inset(0 0 0 0 round 1.5rem)'
-            : 'inset(0 0 calc(100% - 3.5rem) 0 round 9999px)',
-        }}
+        ref={islandRef}
+        className={cn(
+          'dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border xl:hidden',
+          open
+            ? '[clip-path:inset(0_0_0_0_round_1.5rem)]'
+            : '[clip-path:inset(0_0_calc(100%-3.5rem)_0_round_9999px)]',
+        )}
+        data-open={open ? 'true' : undefined}
         aria-label={open ? 'Komut merkezi' : 'Komut çubuğu'}
         data-entity="dock"
         role={open ? 'dialog' : undefined}
