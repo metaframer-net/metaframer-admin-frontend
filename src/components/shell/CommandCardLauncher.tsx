@@ -39,7 +39,7 @@ export function CommandCardLauncher() {
       {/* Anchored under the mobile command bar (top-16) and scaled up from its top
           edge, so it reads as expanding OUT of the bar rather than popping in the
           screen center. `rounded-3xl` matches the dock pill's open radius. */}
-      <DialogContent className="dock-command-center top-16 max-h-[calc(100dvh-5rem)] w-[calc(100%-2rem)] origin-top translate-y-0 gap-0 overflow-hidden rounded-3xl p-0 duration-[var(--duration-slow)] data-[state=closed]:slide-out-to-top-8 data-[state=open]:slide-in-from-top-8 sm:max-w-2xl">
+      <DialogContent className="dock-command-center top-16 flex max-h-[calc(100dvh-5rem)] w-[calc(100%-2rem)] origin-top translate-y-0 flex-col gap-0 overflow-hidden rounded-3xl p-0 duration-[var(--duration-slow)] data-[state=closed]:slide-out-to-top-8 data-[state=open]:slide-in-from-top-8 sm:max-w-2xl">
         <DialogHeader className="flex-none px-5 pb-3 pr-16 pt-4 text-left">
           <DialogTitle className="text-lg tracking-tight">Nereye gitmek istersin?</DialogTitle>
           <DialogDescription className="sr-only">
