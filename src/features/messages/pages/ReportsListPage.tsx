@@ -4,6 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { DataKanban, type KanbanColumn } from '@/components/data-table/DataKanban';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
@@ -14,6 +20,7 @@ import {
   REASON_CATEGORY_LABELS,
   REPORT_PRIORITY_LABELS,
   REPORT_STATUS_LABELS,
+  REPORT_STATUSES,
   REPORT_SUBJECT_TYPE_LABELS,
 } from '../data/reports';
 import { reportFilters } from '../data/filters';
@@ -44,9 +51,25 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const STATUS_DOT: Record<Report['status'], string> = {
+  open: 'bg-warning',
+  resolved: 'bg-success',
+  dismissed: 'bg-muted-foreground',
+  escalated: 'bg-destructive',
+};
+
+const KANBAN_COLUMNS: KanbanColumn<Report['status']>[] = REPORT_STATUSES.map((s) => ({
+  key: s,
+  label: REPORT_STATUS_LABELS[s],
+  dot: STATUS_DOT[s],
+}));
+
+const REPORT_VIEWS = ['table', 'kanban', 'gallery'] as const satisfies readonly DataView[];
+
 export function ReportsListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
   const { data, isLoading, isError, refetch } = useReports(state.query);
+  const view = parseDataView(state.view, REPORT_VIEWS);
 
   return (
     <div className="space-y-4">
@@ -57,27 +80,29 @@ export function ReportsListPage() {
             İlan, kullanıcı ve mesaj şikayetleri; three-tier moderasyon (çöz / üst mercie taşı / reddet).
           </p>
         </div>
+        <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={REPORT_VIEWS} entity="report" />
       </header>
 
-      <DataTable
-        columns={reportColumns}
-        data={data?.items ?? []}
-        total={data?.total ?? 0}
-        state={state}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        filterBar={
-          <FilterBar
-            tableKey="reports"
-            filters={reportFilters}
-            state={state}
-            searchPlaceholder="Konu, açıklama veya şikayet eden ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        renderSubRow={(row) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={reportColumns}
+          data={data?.items ?? []}
+          total={data?.total ?? 0}
+          state={state}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          filterBar={
+            <FilterBar
+              tableKey="reports"
+              filters={reportFilters}
+              state={state}
+              searchPlaceholder="Konu, açıklama veya şikayet eden ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          renderSubRow={(row) => (
           <div className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 md:grid-cols-4">
               <Detail label="Şikayet No" value={row.id} />
@@ -151,6 +176,81 @@ export function ReportsListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="reports"
+            filters={reportFilters}
+            state={state}
+            searchPlaceholder="Konu, açıklama veya şikayet eden ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Şikayetler yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'kanban' ? (
+            <DataKanban
+              data={data?.items ?? []}
+              columns={KANBAN_COLUMNS}
+              getStatus={(r) => r.status}
+              getKey={(r) => r.id}
+              entity="report"
+              renderCard={(r) => (
+                <div className="bg-card hover:border-primary/40 rounded-lg border border-border p-3 shadow-xs transition-colors">
+                  <p className="text-sm font-semibold">{r.subjectLabel}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <ReportPriorityBadge priority={r.priority} />
+                    <ReasonCategoryBadge category={r.reasonCategory} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                    <span className="text-muted-foreground">{r.reporterName}</span>
+                    <span className="text-muted-foreground tabular-nums">
+                      {new Date(r.createdAt).toLocaleDateString('tr-TR')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            />
+          ) : (
+            <DataGallery
+              data={data?.items ?? []}
+              getKey={(r) => r.id}
+              renderCard={(r) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="truncate text-sm font-semibold">{r.subjectLabel}</h3>
+                      <ReportStatusBadge status={r.status} />
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <ReportPriorityBadge priority={r.priority} />
+                      <span className="text-muted-foreground text-xs">{REPORT_SUBJECT_TYPE_LABELS[r.subjectType]}</span>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      <ReasonCategoryBadge category={r.reasonCategory} />
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">{r.reporterName}</p>
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

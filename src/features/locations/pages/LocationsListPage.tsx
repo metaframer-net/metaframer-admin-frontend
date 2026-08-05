@@ -6,6 +6,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { ViewPlaceholder } from '@/components/data-table/ViewPlaceholder';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -29,8 +35,11 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const LOCATION_VIEWS = ['table', 'gallery', 'map'] as const satisfies readonly DataView[];
+
 export function LocationsListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
+  const view = parseDataView(state.view, LOCATION_VIEWS);
   const { data, isLoading, isError, refetch } = useProvinces(state.query);
   const upsert = useUpsertProvince();
   const reorder = useReorderProvinces(state.query);
@@ -69,38 +78,42 @@ export function LocationsListPage() {
             İl → ilçe → mahalle coğrafi taksonomisi. İlan formu ve şehir filtreleri bu tek kaynaktan beslenir.
           </p>
         </div>
-        <Can permission="location.manage">
-          <ProvinceFormDialog
+        <div className="flex items-center gap-2">
+          <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={LOCATION_VIEWS} entity="location" />
+          <Can permission="location.manage">
+            <ProvinceFormDialog
             onSubmit={async (values) => {
               const created = await upsert.mutateAsync({ values });
               navigate(`/locations/${created.id}`);
             }}
           />
-        </Can>
+          </Can>
+        </div>
       </header>
 
-      <DataTable
-        columns={provinceColumns}
-        data={ordered}
-        total={data?.total ?? 0}
-        state={state}
-        meta={meta}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        emptyTitle="İl bulunamadı"
-        emptyDescription="Filtreleri değiştirin ya da yeni bir il oluşturun."
-        filterBar={
-          <FilterBar
-            tableKey="locations"
-            filters={provinceFilters}
-            state={state}
-            searchPlaceholder="İl adı veya plaka ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        bulkActions={(ids, _all, clear) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={provinceColumns}
+          data={ordered}
+          total={data?.total ?? 0}
+          state={state}
+          meta={meta}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          emptyTitle="İl bulunamadı"
+          emptyDescription="Filtreleri değiştirin ya da yeni bir il oluşturun."
+          filterBar={
+            <FilterBar
+              tableKey="locations"
+              filters={provinceFilters}
+              state={state}
+              searchPlaceholder="İl adı veya plaka ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          bulkActions={(ids, _all, clear) => (
           <BulkProvinceActions provinces={ordered.filter((p) => ids.includes(p.id))} clear={clear} />
         )}
         renderSubRow={(row) => (
@@ -151,6 +164,58 @@ export function LocationsListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="locations"
+            filters={provinceFilters}
+            state={state}
+            searchPlaceholder="İl adı veya plaka ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Lokasyonlar yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'gallery' ? (
+            <DataGallery
+              data={ordered}
+              getKey={(p) => p.id}
+              renderCard={(p) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">
+                        <span className="text-muted-foreground tabular-nums">{p.code}</span>{' '}
+                        {p.label}
+                      </h3>
+                      <LocationStatusBadge status={p.status} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                      <span className="text-muted-foreground tabular-nums">{p.districts.length} ilçe</span>
+                      <span className="text-muted-foreground tabular-nums">Sıra: {p.order + 1}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          ) : (
+            <ViewPlaceholder view={view} entityLabel="Lokasyonlar" />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

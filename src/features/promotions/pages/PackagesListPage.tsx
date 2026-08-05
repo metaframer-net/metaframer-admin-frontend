@@ -5,12 +5,18 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { DataKanban, type KanbanColumn } from '@/components/data-table/DataKanban';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { exportCsv, exportXls } from '@/lib/export';
 import { Can } from '@/lib/permissions/permission-context';
-import { PACKAGE_KIND_LABELS, PACKAGE_STATUS_LABELS } from '../data/promotions';
+import { PACKAGE_KIND_LABELS, PACKAGE_STATUS_LABELS, PACKAGE_STATUSES } from '../data/promotions';
 import { packageFilters } from '../data/filters';
 import { packageColumns, type PackageTableMeta } from '../components/packageColumns';
 import { PackageFormDialog } from '../components/PackageFormDialog';
@@ -32,10 +38,24 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const STATUS_DOT: Record<DopingPackage['status'], string> = {
+  active: 'bg-success',
+  archived: 'bg-muted-foreground',
+};
+
+const KANBAN_COLUMNS: KanbanColumn<DopingPackage['status']>[] = PACKAGE_STATUSES.map((s) => ({
+  key: s,
+  label: PACKAGE_STATUS_LABELS[s],
+  dot: STATUS_DOT[s],
+}));
+
+const PACKAGE_VIEWS = ['table', 'kanban', 'gallery'] as const satisfies readonly DataView[];
+
 export function PackagesListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
   const { data, isLoading, isError, refetch } = usePackages(state.query);
   const upsert = useUpsertPackage();
+  const view = parseDataView(state.view, PACKAGE_VIEWS);
 
   const items = data?.items ?? [];
   const ordered = sortByOrder(items);
@@ -56,37 +76,41 @@ export function PackagesListPage() {
             İlanları öne çıkaran doping paketleri; oluştur, düzenle ve arşivle. Değişiklikler denetim kaydına yazılır.
           </p>
         </div>
-        <Can permission="promotion.sell">
-          <PackageFormDialog
+        <div className="flex items-center gap-2">
+          <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={PACKAGE_VIEWS} entity="package" />
+          <Can permission="promotion.sell">
+            <PackageFormDialog
             onSubmit={async (values) => {
               await upsert.mutateAsync({ values: packageFormToPayload(values) });
             }}
           />
         </Can>
+        </div>
       </header>
 
-      <DataTable
-        columns={packageColumns}
-        data={ordered}
-        total={data?.total ?? 0}
-        state={state}
-        meta={meta}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        emptyTitle="Paket bulunamadı"
-        emptyDescription="Filtreleri değiştirin ya da yeni bir paket oluşturun."
-        filterBar={
-          <FilterBar
-            tableKey="packages"
-            filters={packageFilters}
-            state={state}
-            searchPlaceholder="Paket adı ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        renderSubRow={(row) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={packageColumns}
+          data={ordered}
+          total={data?.total ?? 0}
+          state={state}
+          meta={meta}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          emptyTitle="Paket bulunamadı"
+          emptyDescription="Filtreleri değiştirin ya da yeni bir paket oluşturun."
+          filterBar={
+            <FilterBar
+              tableKey="packages"
+              filters={packageFilters}
+              state={state}
+              searchPlaceholder="Paket adı ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          renderSubRow={(row) => (
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
             <Detail label="Paket No" value={row.id} />
             <Detail label="Tür" value={PACKAGE_KIND_LABELS[row.kind]} />
@@ -147,6 +171,77 @@ export function PackagesListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="packages"
+            filters={packageFilters}
+            state={state}
+            searchPlaceholder="Paket adı ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Paketler yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'kanban' ? (
+            <DataKanban
+              data={ordered}
+              columns={KANBAN_COLUMNS}
+              getStatus={(p) => p.status}
+              getKey={(p) => p.id}
+              entity="package"
+              renderCard={(p) => (
+                <div className="bg-card hover:border-primary/40 rounded-lg border border-border p-3 shadow-xs transition-colors">
+                  <p className="text-sm font-semibold">{p.name}</p>
+                  <div className="mt-1">
+                    <PackageKindBadge kind={p.kind} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                    <span className="tabular-nums font-medium">{formatTry(p.price)}</span>
+                    <span className="text-muted-foreground tabular-nums">{p.durationDays} gün</span>
+                  </div>
+                </div>
+              )}
+            />
+          ) : (
+            <DataGallery
+              data={ordered}
+              getKey={(p) => p.id}
+              renderCard={(p) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="truncate text-sm font-semibold">{p.name}</h3>
+                      <PackageStatusBadge status={p.status} />
+                    </div>
+                    <div className="mt-1">
+                      <PackageKindBadge kind={p.kind} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                      <span className="tabular-nums font-medium">{formatTry(p.price)}</span>
+                      <span className="text-muted-foreground tabular-nums">{p.durationDays} gün</span>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs tabular-nums">Sıra: {p.order + 1}</p>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-/** Client-side table exporters (CSV + Excel-compatible .xls). No dependencies. */
+/** Client-side table exporters (CSV + Excel-compatible .xls) and CSV importer. No dependencies. */
 
 function download(filename: string, mime: string, content: string): void {
   const blob = new Blob([content], { type: `${mime};charset=utf-8;` });
@@ -36,4 +36,51 @@ export function exportXls(filename: string, headers: string[], rows: string[][])
     .join('');
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table>${thead}${tbody}</table></body></html>`;
   download(filename.endsWith('.xls') ? filename : `${filename}.xls`, 'application/vnd.ms-excel', html);
+}
+
+// ── Import ─────────────────────────────────────────────────────────────────
+
+/** Parse a CSV file into header + row arrays. Handles BOM, quoted fields, Turkish chars. */
+export async function parseCsvFile(file: File): Promise<{ headers: string[]; rows: string[][] }> {
+  const text = await file.text();
+  // Strip BOM
+  const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const lines = clean.split(/\r?\n/).filter((line) => line.trim() !== '');
+
+  const parseLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') {
+            current += '"';
+            i++; // skip escaped quote
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          current += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',' || ch === ';') {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const firstLine = lines[0];
+  const headers = firstLine ? parseLine(firstLine) : [];
+  const rows = lines.slice(1).map(parseLine);
+
+  return { headers, rows };
 }

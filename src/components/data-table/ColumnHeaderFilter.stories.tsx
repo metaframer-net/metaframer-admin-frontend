@@ -18,7 +18,7 @@ const facetedFilter: FilterConfig = {
   ],
 };
 
-const rangeFilter: FilterConfig = { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺' };
+const rangeFilter: FilterConfig = { id: 'price', label: 'Fiyat', kind: 'numberRange', unit: '₺', sliderMin: 0, sliderMax: 10_000_000, sliderStep: 50_000 };
 
 function Harness() {
   const state = useTableUrlState();

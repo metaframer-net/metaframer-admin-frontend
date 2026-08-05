@@ -26,7 +26,7 @@ import { DataTablePagination } from './DataTablePagination';
 import { BulkActionBar } from './BulkActionBar';
 import type { TableUrlState } from './use-table-url-state';
 
-const VIRTUAL_THRESHOLD = 30;
+const VIRTUAL_THRESHOLD = 200;
 const ROW_HEIGHT = 44;
 /** Id of the auto-injected expander column (see `expanderColumn`). */
 const EXPANDER_ID = '__expander';
@@ -50,6 +50,8 @@ export interface DataTableProps<TData> {
   bulkActions?: (selectedIds: string[], allMatching: boolean, clear: () => void) => React.ReactNode;
   /** Export handler; receives the current page rows + selection. */
   onExport?: (format: ExportFormat, scope: ExportScope, ctx: { pageRows: TData[]; selectedIds: string[] }) => void | Promise<void>;
+  /** Import handler; when provided, an import option appears in the export menu. */
+  onImport?: (file: File) => void | Promise<void>;
   /** Arbitrary table meta forwarded to columns via `table.options.meta`. */
   meta?: unknown;
   emptyTitle?: string;
@@ -123,6 +125,7 @@ export function DataTable<TData>({
   renderMobileCard,
   bulkActions,
   onExport,
+  onImport,
   meta,
   emptyTitle = 'Kayıt bulunamadı',
   emptyDescription = 'Filtreleri değiştirin ya da yeni bir kayıt oluşturun.',
@@ -226,7 +229,13 @@ export function DataTable<TData>({
             <DensityToggle />
             <ColumnVisibility table={table} />
           </div>
-          {onExport && <ExportMenu selectedCount={selectedIds.length} onExport={handleExport} />}
+          {(onExport || onImport) && (
+            <ExportMenu
+              selectedCount={selectedIds.length}
+              onExport={onExport ? handleExport : () => {}}
+              onImport={onImport}
+            />
+          )}
         </div>
       </div>
 
@@ -256,7 +265,7 @@ export function DataTable<TData>({
           {/* Desktop table */}
           <div
             ref={scrollRef}
-            className="relative hidden max-h-[32rem] overflow-auto rounded-lg border border-border xl:block"
+            className="relative hidden overflow-x-auto rounded-lg border border-border xl:block"
           >
             <table className="w-full caption-bottom text-sm" role="grid">
               <thead className="bg-muted/60 sticky top-0 z-10 backdrop-blur">

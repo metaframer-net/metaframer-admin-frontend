@@ -339,9 +339,14 @@ function NumberRangeFilter({ filter, state }: { filter: FilterConfig; state: Tab
           {...(filter.unit ? { unit: filter.unit } : {})}
           value={value}
           onChange={(v) => {
-            state.setFilter(`${filter.id}Min`, v.min !== undefined ? String(v.min) : null);
-            state.setFilter(`${filter.id}Max`, v.max !== undefined ? String(v.max) : null);
+            state.setFilters({
+              [`${filter.id}Min`]: v.min !== undefined ? String(v.min) : null,
+              [`${filter.id}Max`]: v.max !== undefined ? String(v.max) : null,
+            });
           }}
+          sliderMin={filter.sliderMin}
+          sliderMax={filter.sliderMax}
+          sliderStep={filter.sliderStep}
         />
       </PopoverContent>
     </Popover>

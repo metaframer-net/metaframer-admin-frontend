@@ -3,11 +3,17 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/data-table/DataTable';
 import { MobileListCard } from '@/components/data-table/MobileListCard';
 import { FilterBar } from '@/components/data-table/FilterBar';
+import { ViewSwitch, parseDataView, type DataView } from '@/components/data-table/ViewSwitch';
+import { DataKanban, type KanbanColumn } from '@/components/data-table/DataKanban';
+import { DataGallery } from '@/components/data-table/DataGallery';
+import { ErrorState } from '@/components/feedback/ErrorState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/data-table/DataTablePagination';
 import { useTableUrlState } from '@/components/data-table/use-table-url-state';
 import { exportCsv, exportXls } from '@/lib/export';
 import { api, encodeListQuery } from '@/lib/api/client';
 import type { Paginated } from '@/lib/api/types';
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from '../data/promotions';
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from '../data/promotions';
 import { paymentFilters } from '../data/filters';
 import { paymentColumns } from '../components/paymentColumns';
 import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
@@ -28,9 +34,25 @@ function parseNaturalLanguage(text: string): Record<string, string | string[]> {
   return out;
 }
 
+const STATUS_DOT: Record<Payment['status'], string> = {
+  paid: 'bg-success',
+  refunded: 'bg-chart-4',
+  'partially-refunded': 'bg-warning',
+  failed: 'bg-destructive',
+};
+
+const KANBAN_COLUMNS: KanbanColumn<Payment['status']>[] = PAYMENT_STATUSES.map((s) => ({
+  key: s,
+  label: PAYMENT_STATUS_LABELS[s],
+  dot: STATUS_DOT[s],
+}));
+
+const PAYMENT_VIEWS = ['table', 'kanban', 'gallery'] as const satisfies readonly DataView[];
+
 export function PaymentsListPage() {
   const state = useTableUrlState({ defaultPageSize: 25 });
   const { data, isLoading, isError, refetch } = usePayments(state.query);
+  const view = parseDataView(state.view, PAYMENT_VIEWS);
 
   return (
     <div className="space-y-4">
@@ -41,29 +63,31 @@ export function PaymentsListPage() {
             Doping satın alma ödemeleri ve faturaları; satır seçip iade için detaya gidin.
           </p>
         </div>
+        <ViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} views={PAYMENT_VIEWS} entity="payment" />
       </header>
 
-      <DataTable
-        columns={paymentColumns}
-        data={data?.items ?? []}
-        total={data?.total ?? 0}
-        state={state}
-        getRowId={(r) => r.id}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={() => void refetch()}
-        emptyTitle="Ödeme bulunamadı"
-        emptyDescription="Filtreleri değiştirin ya da tarih aralığını genişletin."
-        filterBar={
-          <FilterBar
-            tableKey="payments"
-            filters={paymentFilters}
-            state={state}
-            searchPlaceholder="Fatura no, kullanıcı veya paket ara…"
-            onNaturalLanguage={parseNaturalLanguage}
-          />
-        }
-        renderSubRow={(row) => (
+      {view === 'table' ? (
+        <DataTable
+          columns={paymentColumns}
+          data={data?.items ?? []}
+          total={data?.total ?? 0}
+          state={state}
+          getRowId={(r) => r.id}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => void refetch()}
+          emptyTitle="Ödeme bulunamadı"
+          emptyDescription="Filtreleri değiştirin ya da tarih aralığını genişletin."
+          filterBar={
+            <FilterBar
+              tableKey="payments"
+              filters={paymentFilters}
+              state={state}
+              searchPlaceholder="Fatura no, kullanıcı veya paket ara…"
+              onNaturalLanguage={parseNaturalLanguage}
+            />
+          }
+          renderSubRow={(row) => (
           <div className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 md:grid-cols-4">
               <Detail label="Fatura No" value={row.invoiceNo} />
@@ -135,6 +159,77 @@ export function PaymentsListPage() {
           }
         }}
       />
+      ) : (
+        <div className="space-y-3">
+          <FilterBar
+            tableKey="payments"
+            filters={paymentFilters}
+            state={state}
+            searchPlaceholder="Fatura no, kullanıcı veya paket ara…"
+            onNaturalLanguage={parseNaturalLanguage}
+          />
+          {isError ? (
+            <ErrorState onRetry={() => void refetch()} />
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Ödemeler yükleniyor">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : view === 'kanban' ? (
+            <DataKanban
+              data={data?.items ?? []}
+              columns={KANBAN_COLUMNS}
+              getStatus={(p) => p.status}
+              getKey={(p) => p.id}
+              entity="payment"
+              renderCard={(p) => (
+                <div className="bg-card hover:border-primary/40 rounded-lg border border-border p-3 shadow-xs transition-colors">
+                  <p className="text-sm font-semibold tabular-nums">{p.invoiceNo}</p>
+                  <p className="text-muted-foreground mt-1 text-xs">{p.userName}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{p.packageName}</p>
+                  <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                    <span className="tabular-nums font-medium">{formatTry(p.amount)}</span>
+                    <PaymentMethodBadge method={p.method} />
+                  </div>
+                </div>
+              )}
+            />
+          ) : (
+            <DataGallery
+              data={data?.items ?? []}
+              getKey={(p) => p.id}
+              renderCard={(p) => (
+                <div className="bg-card overflow-hidden rounded-xl border border-border shadow-xs transition-shadow hover:shadow-md">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold tabular-nums">{p.invoiceNo}</h3>
+                      <PaymentStatusBadge status={p.status} />
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">{p.userName}</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">{p.packageName}</p>
+                    <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 text-xs">
+                      <span className="tabular-nums font-medium">{formatTry(p.amount)}</span>
+                      <PaymentMethodBadge method={p.method} />
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs tabular-nums">
+                      {new Date(p.createdAt).toLocaleDateString('tr-TR')}
+                    </p>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          <DataTablePagination
+            page={state.pagination.pageIndex + 1}
+            pageSize={state.pagination.pageSize}
+            total={data?.total ?? 0}
+            selectedCount={0}
+            onPageChange={state.setPage}
+            onPageSizeChange={state.setPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 }

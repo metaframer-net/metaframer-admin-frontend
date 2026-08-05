@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/feedback/ErrorState';
 import { useLeads, useCrmStats } from '../api/queries';
-import { useTableUrlState } from '@/components/data-table/use-table-url-state';
+import type { TableQuery } from '@/components/data-table/types';
 import { LEAD_STAGE_LABELS, LEAD_PRIORITY_LABELS } from '../data/crm';
 const PIPELINE_STAGES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'] as const;
 
@@ -47,9 +47,10 @@ function formatTry(value: number): string {
   return `₺${value}`;
 }
 
+const PIPELINE_QUERY: TableQuery = { page: 1, pageSize: 1000, sort: [], filters: {}, q: '' };
+
 export function CrmPipelinePage() {
-  const state = useTableUrlState({ defaultPageSize: 1000 });
-  const { data, isLoading, isError, refetch } = useLeads(state.query);
+  const { data, isLoading, isError, refetch } = useLeads(PIPELINE_QUERY);
   const { isLoading: statsLoading } = useCrmStats();
   const leads = useMemo(() => data?.items ?? [], [data]);
 
