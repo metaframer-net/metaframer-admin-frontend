@@ -102,9 +102,14 @@ export function DockShell({ children, now }: DockShellProps) {
       <div
         className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border backdrop-blur-md xl:hidden"
         style={{
+          // Collapsed radius is 1.75rem (= half the 3.5rem pill height → fully round
+          // ends, identical to the old 9999px which the browser capped anyway). The
+          // OPEN radius is 1.5rem. Keeping both small means the clip-path morph stays
+          // a clean rounded rectangle the whole way; the old 9999px→1.5rem interpolation
+          // ballooned into an ugly capsule mid-animation that clipped the content.
           clipPath: open
             ? 'inset(0 0 0 0 round 1.5rem)'
-            : 'inset(0 0 calc(100% - 3.5rem) 0 round 9999px)',
+            : 'inset(0 0 calc(100% - 3.5rem) 0 round 1.75rem)',
         }}
         aria-label={open ? 'Komut merkezi' : 'Komut çubuğu'}
         data-entity="dock"
