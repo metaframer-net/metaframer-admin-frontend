@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { api, type ApiError } from '@/lib/api/client';
 import { getAuditFor } from '@/lib/audit';
@@ -237,35 +237,20 @@ describe('auth handlers — account security', () => {
     expect(info.sessions.every((s) => s.current)).toBe(true);
   });
 
-  it('refreshes the token (old one valid during the grace window, then rejected)', async () => {
-    // Fake only Date so the grace window can be crossed without waiting; MSW's
-    // own timers stay real. Reset the stored token after refresh manually since a
-    // direct api.post does not persist it (only the 401-retry path does).
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-      const res = await authed();
-      const old = res.token!;
-      const { token: fresh } = await api.post<{ token: string }>('/auth/refresh');
-      expect(fresh).not.toBe(old);
+  it('refreshes the token (rotation is non-destructive; the old token stays valid)', async () => {
+    const res = await authed();
+    const old = res.token!;
+    const { token: fresh } = await api.post<{ token: string }>('/auth/refresh');
+    expect(fresh).not.toBe(old);
 
-      // Within the grace window the previous token still resolves.
-      setAuthToken(old);
-      const meGrace = await api.get<{ role: string }>('/auth/me');
-      expect(meGrace.role).toBe('moderator');
-
-      // Once the grace window elapses the old token is rejected. The client tries
-      // one silent refresh with it first, which also fails, so a 401 surfaces.
-      vi.setSystemTime(Date.now() + 31_000);
-      setAuthToken(old);
-      const err = await api.get('/auth/me').catch((e: unknown) => e);
-      expect((err as ApiError).status).toBe(401);
-
-      setAuthToken(fresh);
-      const me = await api.get<{ role: string }>('/auth/me');
-      expect(me.role).toBe('moderator');
-    } finally {
-      vi.useRealTimers();
-    }
+    // Both the rotated-in token AND the previous one keep resolving: the mock
+    // never revokes on refresh, so a second tab (or an in-flight request) still
+    // carrying the old token is never spuriously signed out. Only an explicit
+    // logout invalidates a token — covered by the logout test above.
+    setAuthToken(fresh);
+    expect((await api.get<{ role: string }>('/auth/me')).role).toBe('moderator');
+    setAuthToken(old);
+    expect((await api.get<{ role: string }>('/auth/me')).role).toBe('moderator');
   });
 
   it('reauth accepts the correct password and rejects a wrong one', async () => {

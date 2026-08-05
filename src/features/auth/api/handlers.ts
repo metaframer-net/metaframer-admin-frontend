@@ -31,8 +31,7 @@ import {
 // ---------------------------------------------------------------------------
 
 let sessions = new Map<string, string>(); // session token -> user id
-let revokedTokens = new Set<string>(); // tokens invalidated by logout/refresh
-let graceTokens = new Map<string, number>(); // rotated token -> ms timestamp when it stops being accepted
+let revokedTokens = new Set<string>(); // tokens invalidated by an explicit logout only
 let challenges = new Map<string, string>(); // 2FA challenge token -> user id
 let setupChallenges = new Map<string, string>(); // mandatory-2FA setup token -> user id
 let resetTokens = new Map<string, string>(); // reset token -> email
@@ -46,19 +45,10 @@ let otherSessions = new Map<string, ActiveSession[]>(); // user id -> other devi
 let activeOrgByUser = new Map<string, string>(); // user id -> active org id
 let seq = 0;
 
-/**
- * Grace window (ms) a rotated token stays valid after `/auth/refresh` mints a
- * fresh one. Without it, a stray in-flight request (or a second open tab) still
- * carrying the previous token races the rotation and 401s, bouncing the user to
- * /session-expired right after signing in. 30s comfortably covers those overlaps.
- */
-const REFRESH_GRACE_MS = 30 * 1000;
-
 /** Reset the whole mock auth backend (tests). */
 export function resetAuthDb(): void {
   sessions = new Map();
   revokedTokens = new Set();
-  graceTokens = new Map();
   challenges = new Map();
   setupChallenges = new Map();
   resetTokens = new Map();
@@ -139,8 +129,22 @@ function sessionsFor(userId: string): ActiveSession[] {
   return [current, ...(otherSessions.get(userId) ?? [])];
 }
 
+/**
+ * A per-tab-unique token nonce. MSW runs its request handlers (and this in-memory
+ * state) SEPARATELY in each browser tab, but the bearer token lives in shared
+ * localStorage. With only a per-tab `seq`, two tabs mint the IDENTICAL
+ * `mock-<user>-<n>` string — so one tab can treat another tab's freshly-minted
+ * token as its own previously-revoked one and 401 it, bouncing the user to
+ * /session-expired. A globally-unique nonce per tab makes cross-tab collisions
+ * impossible while leaving revocation semantics (logout, refresh grace) intact.
+ */
+const TAB_NONCE =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().replace(/-/g, '')
+    : Math.floor(Math.random() * 1e12).toString(36);
+
 function mintSession(userId: string): string {
-  const token = `mock-${userId}-${nextId()}`;
+  const token = `mock-${userId}-${nextId()}${TAB_NONCE}`;
   sessions.set(token, userId);
   return token;
 }
@@ -152,18 +156,11 @@ function mintSession(userId: string): string {
  */
 function userIdForToken(token: string | null): string | null {
   if (!token || revokedTokens.has(token)) return null;
-  // A rotated token is honoured until its grace window elapses, then promoted to
-  // fully revoked. Checked lazily here so there are no dangling timers to leak
-  // across resetAuthDb() in tests.
-  const graceExpiry = graceTokens.get(token);
-  if (graceExpiry !== undefined && Date.now() >= graceExpiry) {
-    graceTokens.delete(token);
-    revokedTokens.add(token);
-    return null;
-  }
   const mapped = sessions.get(token);
   if (mapped) return mapped;
-  const parsed = /^mock-(.+)-\d+$/.exec(token);
+  // Trailing segment is `<seq><TAB_NONCE>` (digits + optional alphanumerics), so
+  // accept alphanumerics — not just `\d+` — while still parsing the user id out.
+  const parsed = /^mock-(.+)-[0-9a-z]+$/.exec(token);
   return parsed ? parsed[1]! : null;
 }
 
@@ -485,11 +482,14 @@ export const authHandlers = [
     const token = bearer(request);
     const admin = adminForRequest(request);
     if (!admin || !token) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
-    sessions.delete(token);
-    // Keep the previous token valid for a short grace window instead of revoking
-    // it immediately, so requests still in flight with it (or a background tab)
-    // don't 401 the moment the tab regains focus. See REFRESH_GRACE_MS.
-    graceTokens.set(token, Date.now() + REFRESH_GRACE_MS);
+    // Rotation is NON-destructive in this mock: mint a fresh token but DO NOT
+    // revoke the old one. MSW keeps its handler state per browser TAB while the
+    // token lives in SHARED localStorage, so revoking on refresh let one tab
+    // invalidate a token another tab was still using → a spurious 401 →
+    // /session-expired. A well-formed token now stays valid until an explicit
+    // logout; real session hardening belongs to the FastAPI backend, not this
+    // single-admin dev mock. Unique per-tab token nonces (see mintSession) keep
+    // rotated tokens distinct on top of this.
     const fresh = mintSession(admin.id);
     return HttpResponse.json({ token: fresh });
   }),
