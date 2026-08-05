@@ -73,7 +73,7 @@ export function LocationsListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Lokasyonlar</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Lokasyonlar</h1>
           <p className="text-muted-foreground text-sm">
             İl → ilçe → mahalle coğrafi taksonomisi. İlan formu ve şehir filtreleri bu tek kaynaktan beslenir.
           </p>

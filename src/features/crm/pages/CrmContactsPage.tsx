@@ -91,7 +91,7 @@ export function CrmContactsPage() {
 
   const renderSubRow = useCallback(
     (row: Contact) => (
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm xl:grid-cols-4">
         <Detail label="E-posta" value={row.email} />
         <Detail label="Telefon" value={row.phone} />
         <Detail label="Şirket" value={row.company ?? '—'} />
@@ -152,9 +152,9 @@ export function CrmContactsPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">CRM — Kişiler</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">CRM — Kişiler</h1>
           <p className="text-muted-foreground text-sm">Müşteri ilişkileri ve portföy yönetimi.</p>
         </div>
         <div className="flex items-center gap-2">

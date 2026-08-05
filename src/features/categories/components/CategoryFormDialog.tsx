@@ -123,7 +123,7 @@ export function CategoryFormDialog({ category, onSubmit, trigger }: CategoryForm
               <Textarea rows={2} placeholder="Daire, villa, müstakil ev…" data-action="edit-field" data-entity="category" />
             </FormField>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField name="icon" label="Simge" help="Menü ve kartlarda kullanılacak simge.">
                 {(f) => (
                   <Select value={(f.value as string) || ''} onValueChange={f.onChange}>

@@ -84,7 +84,7 @@ export function ListingsListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">İlanlar</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">İlanlar</h1>
           <p className="text-muted-foreground text-sm">Konut, işyeri, arsa, devremülk ve turistik ilanları.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -119,7 +119,7 @@ export function ListingsListPage() {
           onRetry={() => void refetch()}
           filterBar={filterBar}
           renderSubRow={(row) => (
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm xl:grid-cols-4">
               <Detail label="İlan No" value={row.id} />
               <Detail label="Ofis" value={row.agentName} />
               <Detail label="Brüt m²" value={row.attributes.grossArea?.toString() ?? '—'} />

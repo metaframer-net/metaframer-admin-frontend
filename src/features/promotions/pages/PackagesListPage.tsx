@@ -71,7 +71,7 @@ export function PackagesListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Doping Paketleri</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Doping Paketleri</h1>
           <p className="text-muted-foreground text-sm">
             İlanları öne çıkaran doping paketleri; oluştur, düzenle ve arşivle. Değişiklikler denetim kaydına yazılır.
           </p>
@@ -111,7 +111,7 @@ export function PackagesListPage() {
             />
           }
           renderSubRow={(row) => (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm xl:grid-cols-4">
             <Detail label="Paket No" value={row.id} />
             <Detail label="Tür" value={PACKAGE_KIND_LABELS[row.kind]} />
             <Detail label="Süre" value={`${row.durationDays} gün`} />

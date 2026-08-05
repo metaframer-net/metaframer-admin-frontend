@@ -53,7 +53,7 @@ export function AuditListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Denetim Kaydı</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Denetim Kaydı</h1>
           <p className="text-muted-foreground text-sm">
             Tüm modüllerdeki yönetici ve yapay zeka işlemlerinin değiştirilemez kaydı. Salt okunur.
           </p>

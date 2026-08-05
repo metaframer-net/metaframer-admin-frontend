@@ -96,7 +96,7 @@ export function PackageFormDialog({ pkg, onSubmit, trigger }: PackageFormDialogP
               <Input placeholder="Öne Çıkar 7 Gün" data-action="edit-field" data-entity="package" />
             </FormField>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField name="kind" label="Tür" help="İlanın nasıl öne çıkarılacağını belirler.">
                 {(f) => (
                   <Select value={(f.value as string) || 'featured'} onValueChange={f.onChange}>
@@ -132,7 +132,7 @@ export function PackageFormDialog({ pkg, onSubmit, trigger }: PackageFormDialogP
               </FormField>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 name="durationDays"
                 label="Süre (gün)"

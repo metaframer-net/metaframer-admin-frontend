@@ -162,7 +162,7 @@ export function CrmCalendarPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-2xl font-semibold">CRM Takvim</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">CRM Takvim</h1>
         <p className="text-muted-foreground text-sm">Aktiviteler ve takip planları takvim görünümü.</p>
       </header>
 

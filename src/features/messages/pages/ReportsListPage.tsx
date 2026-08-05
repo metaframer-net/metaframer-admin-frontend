@@ -75,7 +75,7 @@ export function ReportsListPage() {
     <div className="space-y-4">
       <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Mesajlar &amp; Şikayetler</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Mesajlar &amp; Şikayetler</h1>
           <p className="text-muted-foreground text-sm">
             İlan, kullanıcı ve mesaj şikayetleri; three-tier moderasyon (çöz / üst mercie taşı / reddet).
           </p>
@@ -104,7 +104,7 @@ export function ReportsListPage() {
           }
           renderSubRow={(row) => (
           <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 xl:grid-cols-4">
               <Detail label="Şikayet No" value={row.id} />
               <Detail label="Konu No" value={row.subjectId} />
               <Detail label="Tür" value={REPORT_SUBJECT_TYPE_LABELS[row.subjectType]} />

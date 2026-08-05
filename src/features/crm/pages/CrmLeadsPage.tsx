@@ -90,9 +90,9 @@ export function CrmLeadsPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">CRM — Leadler</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">CRM — Leadler</h1>
           <p className="text-muted-foreground text-sm">Satış fırsatları ve pipeline yönetimi.</p>
         </div>
         <div className="flex items-center gap-2">
