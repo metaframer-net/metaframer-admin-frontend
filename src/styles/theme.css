@@ -652,6 +652,28 @@
     pointer-events: auto;
     transform: translateX(0);
   }
+
+  /* ── Mobile Dynamic Island ──────────────────────────────────────────────
+     One element morphs between pill and panel via clip-path — the ONLY
+     property that is both GPU-composited AND supports `round` for the
+     border-radius morph (rounded-full ↔ rounded-3xl). Zero layout
+     thrashing, zero repaints, pure compositor work → locked 60 fps.
+     The iOS-style spring easing gives the satisfying overshoot-settle. */
+  .dock-island {
+    transition: clip-path 480ms cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: clip-path;
+  }
+  /* While the island is clipped to pill shape, suppress the pc-stack
+     height transition so it never fights the clip-path GPU animation.
+     The selector targets the collapsed state (clip includes calc). */
+  .dock-island .pc-stack {
+    transition: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dock-island {
+      transition-duration: 1ms;
+    }
+  }
 }
 
 /* ===========================================================================
