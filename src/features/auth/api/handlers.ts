@@ -32,6 +32,7 @@ import {
 
 let sessions = new Map<string, string>(); // session token -> user id
 let revokedTokens = new Set<string>(); // tokens invalidated by logout/refresh
+let graceTokens = new Map<string, number>(); // rotated token -> ms timestamp when it stops being accepted
 let challenges = new Map<string, string>(); // 2FA challenge token -> user id
 let setupChallenges = new Map<string, string>(); // mandatory-2FA setup token -> user id
 let resetTokens = new Map<string, string>(); // reset token -> email
@@ -45,10 +46,19 @@ let otherSessions = new Map<string, ActiveSession[]>(); // user id -> other devi
 let activeOrgByUser = new Map<string, string>(); // user id -> active org id
 let seq = 0;
 
+/**
+ * Grace window (ms) a rotated token stays valid after `/auth/refresh` mints a
+ * fresh one. Without it, a stray in-flight request (or a second open tab) still
+ * carrying the previous token races the rotation and 401s, bouncing the user to
+ * /session-expired right after signing in. 30s comfortably covers those overlaps.
+ */
+const REFRESH_GRACE_MS = 30 * 1000;
+
 /** Reset the whole mock auth backend (tests). */
 export function resetAuthDb(): void {
   sessions = new Map();
   revokedTokens = new Set();
+  graceTokens = new Map();
   challenges = new Map();
   setupChallenges = new Map();
   resetTokens = new Map();
@@ -142,6 +152,15 @@ function mintSession(userId: string): string {
  */
 function userIdForToken(token: string | null): string | null {
   if (!token || revokedTokens.has(token)) return null;
+  // A rotated token is honoured until its grace window elapses, then promoted to
+  // fully revoked. Checked lazily here so there are no dangling timers to leak
+  // across resetAuthDb() in tests.
+  const graceExpiry = graceTokens.get(token);
+  if (graceExpiry !== undefined && Date.now() >= graceExpiry) {
+    graceTokens.delete(token);
+    revokedTokens.add(token);
+    return null;
+  }
   const mapped = sessions.get(token);
   if (mapped) return mapped;
   const parsed = /^mock-(.+)-\d+$/.exec(token);
@@ -467,7 +486,10 @@ export const authHandlers = [
     const admin = adminForRequest(request);
     if (!admin || !token) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
     sessions.delete(token);
-    revokedTokens.add(token);
+    // Keep the previous token valid for a short grace window instead of revoking
+    // it immediately, so requests still in flight with it (or a background tab)
+    // don't 401 the moment the tab regains focus. See REFRESH_GRACE_MS.
+    graceTokens.set(token, Date.now() + REFRESH_GRACE_MS);
     const fresh = mintSession(admin.id);
     return HttpResponse.json({ token: fresh });
   }),
