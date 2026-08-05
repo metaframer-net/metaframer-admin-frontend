@@ -185,7 +185,7 @@ export function DashboardPage() {
     <div className="space-y-5">
       <header className="animate-fade-in flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Genel Bakış</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Genel Bakış</h1>
           <p className="text-muted-foreground text-sm">
             Kişisel panonuz · {SECTION_LABEL[section]} görünümü
           </p>
