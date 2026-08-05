@@ -9,10 +9,15 @@ existing Storybook browser (Playwright/Chromium) vitest project — no new tooli
 | Guard | Catches | File |
 | --- | --- | --- |
 | **Geometric alignment** (`expectColumnsAligned`, `expectPinnedSeamFlush`, `expectAlignedX`) | the ROOT CAUSE — header/body/pinned columns out of alignment. Fast, deterministic, no image baseline, human-readable diff ("differ by 16px"). | `src/test/visual.ts` |
-| **Responsive pixel snapshot** (`snapshotAcrossViewports`) | the SYMPTOM — anything that moved ≥ threshold, at each breakpoint. | `src/test/visual.ts` |
+| **Responsive pixel snapshot** (`snapshotAcrossViewports`) — **opt-in, not in the default/CI suite** | the SYMPTOM — anything that moved ≥ threshold, at each breakpoint. | `src/test/visual.ts` |
 
-Prefer the geometric guard where you can express the invariant; add a pixel
-snapshot for whole-surface coverage.
+**Only the geometric guards gate CI.** They use `getBoundingClientRect`, so they
+are platform-independent and pass on any machine. Pixel snapshots are NOT wired
+into the default suite: `toMatchScreenshot` baselines are per-OS (a macOS baseline
+fails on Linux CI), so they need a dedicated env-matched setup — a Docker image
+pinned to CI's browser, or a hosted service (Chromatic/Percy). Use
+`snapshotAcrossViewports` only inside such a setup, never in a story that the
+normal `npm run test` collects.
 
 ## Breakpoints (single source of truth)
 
@@ -50,9 +55,10 @@ export const VisualGuard: Story = {
     await freezeForSnapshot();                       // deterministic render
     const h = document.querySelectorAll('[data-testid="hcell"]');
     const b = document.querySelectorAll('[data-testid="bcell"]');
-    expectColumnsAligned(h, b);                      // root-cause guard
+    expectColumnsAligned(h, b);                      // root-cause guard (CI-safe)
     expectPinnedSeamFlush(h[0]!, h[1]!);             // pinned-column seam
-    await snapshotAcrossViewports('listings-table');  // responsive snapshots
+    // NOTE: do NOT call snapshotAcrossViewports here — pixel baselines are per-OS
+    // and would fail on Linux CI. Add it only in an env-matched setup (below).
   },
 };
 ```
@@ -60,20 +66,23 @@ export const VisualGuard: Story = {
 Mark header cells and the first body row's cells with `data-testid="hcell"` /
 `data-testid="bcell"` (or pass your own elements to `expectAlignedX`).
 
-## Baselines
+## Pixel snapshots (opt-in, env-matched only)
 
-`toMatchScreenshot` writes a reference on first run (and fails that run so you
-review it), then diffs against it. To (re)generate after an intended visual
-change:
+`toMatchScreenshot` writes a reference on first run (failing that run so you
+review it), then diffs against it. The baseline filename carries the OS
+(`-chromium-darwin` vs `-chromium-linux`), so a baseline made on one platform
+**does not exist** on another and the check fails every run there. That is exactly
+why pixel snapshots are **not** in the default suite: a macOS-committed baseline
+breaks Linux CI on every push.
 
-```
-npx vitest run --project storybook <story-file> -u
-```
+To use them, run them in the SAME environment that runs them for real:
+- a Docker image pinned to CI's browser (generate baselines in it, commit those), or
+- a hosted visual-regression service (Chromatic / Percy) that owns the baselines.
 
-Commit the `src/test/**/__screenshots__/*.png` baselines. Filenames carry the
-platform (`-chromium-darwin`), so **generate them in the same environment that
-runs CI** — otherwise CI creates its own on first run and fails once. For this
-solo/local setup, baselines live on the dev machine.
+Then, inside that setup only, call `snapshotAcrossViewports(...)` and generate
+baselines with `npx vitest run --project storybook <story-file> -u`. Until such a
+setup exists, rely on the geometric guards + the real-app audit
+(`docs/UI_GATE.md`), which need no baseline and are platform-independent.
 
 ## Avoiding flaky snapshots (already handled by `freezeForSnapshot`)
 
