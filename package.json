@@ -13,6 +13,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest",
+    "ui:audit": "node scripts/ui-audit.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

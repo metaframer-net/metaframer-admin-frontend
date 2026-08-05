@@ -92,6 +92,70 @@ export const InlineNav: Story = {
     // Hovering the launcher reveals the strip (pointer-events flip to auto).
     await userEvent.hover(body.getByRole('button', { name: LAUNCHER }));
     await expect(body.getByRole('navigation', { name: 'Hızlı gezinme' })).toBeInTheDocument();
+    // Sticky sliding highlight: hovering a dot marks it (data-highlighted) and
+    // activates the strip's shared ink (data-active); moving to another dot moves
+    // the highlight there while the ink stays active — the continuous glide.
+    const listings = body.getByRole('button', { name: /^İlanlar$/ });
+    const strip = overview.closest('[data-dock-strip]');
+    await userEvent.hover(overview);
+    await expect(overview).toHaveAttribute('data-highlighted', 'true');
+    await expect(strip).toHaveAttribute('data-active', 'true');
+    await userEvent.hover(listings);
+    await expect(listings).toHaveAttribute('data-highlighted', 'true');
+    await expect(overview).toHaveAttribute('data-highlighted', 'false');
+    await expect(strip).toHaveAttribute('data-active', 'true');
+    // Distance-aware glide: the component writes a per-move `--dock-glide` duration
+    // scaled to how far the ink travels, so a long sweep is paced slower than an
+    // adjacent hop (constant-ish speed). Read it live in the real browser.
+    // The overflow chip is also a `.dock-dot` now — keep only the module dots here.
+    const allDots = strip ? [...strip.querySelectorAll('.dock-dot')] : [];
+    const moduleDots = allDots.filter((d) => !/modül daha/.test(d.getAttribute('aria-label') ?? ''));
+    const farDot = moduleDots[moduleDots.length - 1] as Element; // last module — a long sweep
+    const nearDot = moduleDots[moduleDots.length - 2] as Element; // its neighbour — a short hop
+    const glide = () => parseFloat((strip as HTMLElement).style.getPropertyValue('--dock-glide')) || 0;
+
+    await userEvent.hover(overview); // ink at x:0
+    await userEvent.hover(farDot); // long sweep across the strip
+    const farDur = glide();
+    await userEvent.hover(nearDot); // short hop to the neighbour
+    const nearDur = glide();
+
+    await expect(nearDur).toBeGreaterThanOrEqual(210); // clamp floor
+    await expect(farDur).toBeLessThanOrEqual(380); // clamp ceiling
+    await expect(farDur).toBeGreaterThan(nearDur); // farther ⇒ longer
+
+    // Snap-regression guard: the width transition lives on the element that actually
+    // resizes (the clip), so it is a real, non-zero transition — not an instant jump
+    // with only the ink gliding.
+    const clipDur = parseFloat(getComputedStyle(farDot.querySelector('.dock-dot-clip') as Element).transitionDuration);
+    await expect(clipDur).toBeGreaterThan(0.19);
+    await expect(clipDur).toBeLessThanOrEqual(0.38);
+
+    // Asymmetric label: the highlighted (entering) label settles slower than a
+    // resting one leaves. nearDot is highlighted now; overview is at rest.
+    const lblDur = (el: Element) =>
+      getComputedStyle(el.querySelector('.dock-dot-label') as Element).transitionDuration;
+    await expect(lblDur(nearDot)).toContain('0.26s'); // enter → --duration-slow
+    await expect(lblDur(overview)).toContain('0.18s'); // rest/exit → --duration-base
+
+    // Overflow chip is a full participant in the sliding highlight: crossing from
+    // the last module onto it must NOT collapse the ink (the old "close then open"
+    // bug) — it slides the highlight onto the chip and the strip stays active.
+    const overflow = body.getByRole('button', { name: /modül daha/ });
+    await userEvent.hover(farDot);
+    await expect(strip).toHaveAttribute('data-active', 'true');
+    await userEvent.hover(overflow);
+    await expect(strip).toHaveAttribute('data-active', 'true'); // no collapse
+    await expect(overflow).toHaveAttribute('data-highlighted', 'true');
+    await expect(farDot).toHaveAttribute('data-highlighted', 'false');
+
+    // Hover hysteresis: leaving the strip does NOT collapse the ink immediately — a
+    // brief exit (a long label's reflow nudging a dot out from under the pointer)
+    // has a grace window to return before the strip closes. So right after leaving
+    // it is still active, and only later does it collapse.
+    await userEvent.unhover(overflow);
+    await expect(strip).toHaveAttribute('data-active', 'true'); // grace: still open
+    await waitFor(() => expect(strip).toHaveAttribute('data-active', 'false')); // then collapses
     // Clicking a dot opens the command center inside the pill (it does not navigate).
     await userEvent.click(overview);
     await expect(

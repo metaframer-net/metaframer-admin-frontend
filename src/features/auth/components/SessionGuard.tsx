@@ -4,8 +4,8 @@ import { useIdleTimer } from '../use-idle-timer';
 import { authErrorMessage, useLogout, useReauth } from '../api/hooks';
 import { SessionTimeoutModal } from './SessionTimeoutModal';
 
-/** Default idle window before the session locks (15 minutes). */
-const DEFAULT_IDLE_MS = 15 * 60 * 1000;
+/** Default idle window before the session locks (30 minutes). */
+const DEFAULT_IDLE_MS = 30 * 60 * 1000;
 
 export interface SessionGuardProps {
   /** Idle window in ms before locking. Overridable for tests/demos. */

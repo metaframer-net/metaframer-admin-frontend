@@ -1,7 +1,16 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { useLocation, useMatches } from 'react-router-dom';
 import { MoreHorizontal, X } from 'lucide-react';
 
+import { type NavItem } from '@/config/nav-schema';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { hasRouteMeta } from '@/app/route-meta';
@@ -48,6 +57,286 @@ function useDockClock(now: Date | undefined): Date {
     return () => window.clearInterval(id);
   }, [now]);
   return now ?? tick;
+}
+
+/**
+ * Inline module strip for the engaged pill. A SINGLE highlight (the "ink") slides
+ * between the dots and the highlighted dot unfolds its label — the motion lives in
+ * the `.dock-dot*` rules in theme.css. The highlight is sticky: `highlighted` is
+ * cleared only when the pointer leaves the strip or focus moves out, so travelling
+ * between two dots is one continuous glide instead of the previous per-dot
+ * collapse/expand (which read as the strip jumping).
+ *
+ * Dot widths and the ink's transform/width are set imperatively from measured
+ * label widths, so both interpolate in lockstep. Clicking a dot opens the command
+ * center; the strip is a preview and never navigates on its own.
+ */
+function DockNavStrip({
+  items,
+  overflowCount,
+  pathname,
+  onOpen,
+}: {
+  items: NavItem[];
+  overflowCount: number;
+  pathname: string;
+  onOpen: () => void;
+}) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const inkRef = useRef<HTMLLIElement>(null);
+  // Whether the ink is currently shown (a dot is highlighted). Drives the
+  // "place instantly on first appearance, glide only while already visible" rule
+  // below, so the ink fades in AT the hovered dot instead of sliding in from x:0.
+  const inkShownRef = useRef(false);
+  // The ink's current left offset — the "from" point for the distance-aware glide
+  // duration (how far it must travel to the next dot).
+  const inkXRef = useRef(0);
+  // The width animates on an inner clip wrapper, NOT the button: the button must
+  // stay un-clipped so its `before:-inset-1.5` 44px hit-area expander is not
+  // swallowed by `overflow: hidden`.
+  const clipRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const labelRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const labelWidths = useRef<number[]>([]);
+  const [highlighted, setHighlighted] = useState<number | null>(null);
+
+  // Collapsed dots are the icon box; the highlighted dot is icon + its label's
+  // natural width (the label's own trailing `pr-3` is part of that measurement).
+  // The ink is placed from the same running offset, so it and the dot widen together.
+  const ICON = 32; // size-8 glyph box
+  const GAP = 12; // gap-3 between dots
+  // Distance-aware glide: a base duration plus a per-pixel term, clamped. Pure
+  // travel/speed would peg almost every move to the floor at this scale (dots are
+  // ~44px apart, the whole strip ~220px), so the base + slope spreads a perceptible
+  // gradient across the real range — a neighbour hop stays quick, a sweep across
+  // the strip takes noticeably longer, so the ink reads as one consistent speed.
+  const GLIDE_BASE_MS = 190;
+  const GLIDE_PER_PX = 0.8;
+  const GLIDE_MIN_MS = 210;
+  const GLIDE_MAX_MS = 380;
+  // Grace window before a strip-exit collapses the ink (see `select`/`scheduleCollapse`).
+  const COLLAPSE_GRACE_MS = 140;
+
+  // Hover hysteresis: entering any dot selects it AND cancels a pending collapse;
+  // leaving the strip only SCHEDULES a collapse. A long label's reflow can nudge a
+  // dot out from under a stationary pointer for a frame or two — without this grace
+  // window that momentary exit would collapse the whole strip and re-open on the
+  // next dot ("can't catch it" / open-close flicker, worst near the last dots + the
+  // overflow chip where the reflow shift is largest).
+  const collapseTimer = useRef<number | null>(null);
+  const select = useCallback((i: number) => {
+    if (collapseTimer.current !== null) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+    setHighlighted(i);
+  }, []);
+  const scheduleCollapse = useCallback(() => {
+    if (collapseTimer.current !== null) clearTimeout(collapseTimer.current);
+    collapseTimer.current = window.setTimeout(() => {
+      collapseTimer.current = null;
+      setHighlighted(null);
+    }, COLLAPSE_GRACE_MS);
+  }, []);
+  useEffect(
+    () => () => {
+      if (collapseTimer.current !== null) clearTimeout(collapseTimer.current);
+    },
+    [],
+  );
+
+  const measure = useCallback(() => {
+    labelWidths.current = labelRefs.current.map((el) => el?.scrollWidth ?? 0);
+  }, []);
+
+  const applyLayout = useCallback(() => {
+    const ink = inkRef.current;
+    const list = listRef.current;
+    // First appearance = the ink was hidden and a dot just became highlighted.
+    // Then it must land at the target WITHOUT a transition (fade in in place);
+    // once visible, moving between dots glides via the stylesheet transition.
+    const appearing = highlighted !== null && !inkShownRef.current;
+    let left = 0;
+    clipRefs.current.forEach((clip, i) => {
+      if (!clip) return;
+      const expanded = i === highlighted;
+      const width = expanded ? ICON + (labelWidths.current[i] ?? 0) : ICON;
+      clip.style.width = `${width}px`;
+      if (expanded && ink) {
+        // Scale the glide duration to the travel distance (constant-ish speed).
+        // Skipped while appearing (placed instantly) — no travel to pace.
+        if (list) {
+          if (appearing) {
+            list.style.removeProperty('--dock-glide');
+          } else {
+            const dist = Math.abs(left - inkXRef.current);
+            const dur = Math.min(GLIDE_MAX_MS, Math.max(GLIDE_MIN_MS, GLIDE_BASE_MS + dist * GLIDE_PER_PX));
+            list.style.setProperty('--dock-glide', `${dur}ms`);
+          }
+        }
+        if (appearing) ink.style.transition = 'none';
+        ink.style.transform = `translateX(${left}px)`;
+        ink.style.width = `${width}px`;
+        if (appearing) {
+          void ink.offsetWidth; // flush the jump-free placement…
+          ink.style.transition = ''; // …then hand motion back to the stylesheet
+        }
+        inkXRef.current = left;
+      }
+      left += width + GAP;
+    });
+    // Back at rest: let the collapse use the default relaxed duration.
+    if (highlighted === null) list?.style.removeProperty('--dock-glide');
+    inkShownRef.current = highlighted !== null;
+  }, [highlighted]);
+
+  useLayoutEffect(() => {
+    measure();
+    applyLayout();
+  }, [measure, applyLayout]);
+
+  // Latest applyLayout, so the subscribe-once effect below always calls the current
+  // one WITHOUT re-subscribing on every highlight change. Re-subscribing would make
+  // the already-resolved `fonts.ready` re-fire each render and re-run applyLayout
+  // with the ink already at its target (dist 0) — which would clobber the
+  // distance-aware `--dock-glide` back to the floor after every move.
+  const applyRef = useRef(applyLayout);
+  useLayoutEffect(() => {
+    applyRef.current = applyLayout;
+  }, [applyLayout]);
+
+  // Re-measure when the viewport or the loaded webfont changes label widths.
+  useEffect(() => {
+    const recompute = () => {
+      measure();
+      applyRef.current();
+    };
+    window.addEventListener('resize', recompute);
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (live) recompute();
+    });
+    return () => {
+      live = false;
+      window.removeEventListener('resize', recompute);
+    };
+  }, [measure]);
+
+  return (
+    <nav aria-label="Hızlı gezinme" className="dock-reveal dock-reveal-nav">
+      <div className="flex items-center">
+        <span className="bg-glass-border/70 mx-1.5 h-5 w-px shrink-0" aria-hidden />
+        {/* gap-3 so each 44px hit area (size-8 dot + before:-inset-1.5) stays
+            non-overlapping — WCAG 2.5.8 / the project's 44px touch-target rule. */}
+        <ul
+          ref={listRef}
+          className="relative flex items-center gap-3"
+          data-dock-strip
+          data-active={highlighted !== null ? 'true' : 'false'}
+          onPointerLeave={scheduleCollapse}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) scheduleCollapse();
+          }}
+        >
+          {/* The one shared highlight — slides + resizes to the highlighted dot. An
+              `<li>` (not a bare span) keeps the `<ul>` content model valid; it is
+              `position: absolute` so it never joins the flex flow, and `aria-hidden`
+              removes it from the list's item count. */}
+          <li ref={inkRef} className="dock-dot-ink" aria-hidden />
+          {items.map((item, i) => {
+            const active = isNavItemActive(item.to, pathname);
+            const Icon = item.icon;
+            return (
+              <li key={item.id}>
+                {/* Clicking a dot opens the command center (it does NOT navigate) —
+                    the strip is a preview; navigation happens inside the panel. On
+                    hover/focus the dot expands rightward to reveal the module name.
+                    `before:-inset-1.5` keeps a 44px hit area around the 32px glyph. */}
+                <button
+                  type="button"
+                  onClick={onOpen}
+                  onPointerEnter={() => select(i)}
+                  onFocus={() => select(i)}
+                  aria-label={item.label}
+                  aria-current={active ? 'page' : undefined}
+                  data-highlighted={i === highlighted ? 'true' : 'false'}
+                  className={cn(
+                    // `overflow-hidden` lives on the inner clip span, NOT here, so the
+                    // `before:-inset-1.5` 44px hit-area expander is never clipped.
+                    'dock-dot focus-visible:ring-ring relative z-[1] inline-flex h-8 items-center rounded-full outline-none before:absolute before:-inset-1.5 before:content-[""] active:scale-[0.94] focus-visible:ring-2 motion-reduce:active:scale-100',
+                    // A tint, not a filled block — the sliding ink carries the hover
+                    // highlight; the active page keeps its own persistent tint.
+                    active
+                      ? 'bg-primary/15 text-primary'
+                      : i === highlighted
+                        ? 'text-glass-foreground'
+                        : 'text-muted-foreground',
+                  )}
+                  data-action="open-command-palette"
+                  data-entity={item.aiEntity ?? 'module'}
+                >
+                  {/* Inner clip wrapper — the animated width lives here; it clips the
+                      unfolding label while the button's box (and its hit-area
+                      pseudo-element) stays intact. */}
+                  <span
+                    ref={(el) => {
+                      clipRefs.current[i] = el;
+                    }}
+                    className="dock-dot-clip flex h-8 items-center overflow-hidden rounded-full"
+                  >
+                    <span className="grid size-8 shrink-0 place-items-center">
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <span
+                      ref={(el) => {
+                        labelRefs.current[i] = el;
+                      }}
+                      aria-hidden
+                      className="dock-dot-label shrink-0 whitespace-nowrap pr-3 text-xs font-medium"
+                    >
+                      {item.label}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {overflowCount > 0 && (
+            <li>
+              {/* The overflow chip is a FULL participant in the sliding highlight
+                  (index `items.length`, label-less so it stays icon-width): moving
+                  onto it slides the ink here instead of collapsing it. That kills
+                  the "close then re-open" flicker when the pointer crosses from the
+                  last module onto the chip — and when a long label's reflow nudges
+                  the chip under a stationary pointer. */}
+              <button
+                type="button"
+                onClick={onOpen}
+                onPointerEnter={() => select(items.length)}
+                onFocus={() => select(items.length)}
+                data-highlighted={items.length === highlighted ? 'true' : 'false'}
+                className={cn(
+                  'dock-dot focus-visible:ring-ring relative z-[1] inline-flex h-8 items-center rounded-full outline-none before:absolute before:-inset-1.5 before:content-[""] active:scale-[0.94] focus-visible:ring-2 motion-reduce:active:scale-100',
+                  items.length === highlighted ? 'text-glass-foreground' : 'text-muted-foreground',
+                )}
+                aria-label={`${overflowCount} modül daha — komut merkezini aç`}
+                data-action="open-command-palette"
+                data-entity="command"
+              >
+                <span
+                  ref={(el) => {
+                    clipRefs.current[items.length] = el;
+                  }}
+                  className="dock-dot-clip grid size-8 shrink-0 place-items-center overflow-hidden rounded-full"
+                >
+                  <MoreHorizontal className="size-4" aria-hidden />
+                </span>
+              </button>
+            </li>
+          )}
+        </ul>
+      </div>
+    </nav>
+  );
 }
 
 export interface CommandDockProps {
@@ -301,69 +590,14 @@ export function CommandDock({ now, className }: CommandDockProps) {
 
             {/* Inline module dots — the track collapses to 0fr and springs back to
                 the strip's natural width on hover/focus. It is suppressed while the
-                panel is open, where the card grid supersedes it. */}
-            <nav aria-label="Hızlı gezinme" className="dock-reveal dock-reveal-nav">
-              <div className="flex items-center">
-                <span className="bg-glass-border/70 mx-1.5 h-5 w-px shrink-0" aria-hidden />
-                {/* gap-3 so each 44px hit area (size-8 dot + before:-inset-1.5) stays
-                    non-overlapping — WCAG 2.5.8 / the project's 44px touch-target rule. */}
-                <ul className="flex items-center gap-3">
-                  {inlineItems.map((item) => {
-                    const active = isNavItemActive(item.to, pathname);
-                    const Icon = item.icon;
-                    return (
-                      <li key={item.id}>
-                        {/* Clicking a dot opens the command center (it does NOT navigate) —
-                            the strip is a preview; navigation happens inside the panel.
-                            On hover/focus the dot expands rightward to reveal the module
-                            name (attached slide-out). `before:-inset-1.5` keeps a 44px hit
-                            area around the collapsed 32px glyph. */}
-                        <button
-                          type="button"
-                          onClick={() => setOpen(true)}
-                          aria-label={item.label}
-                          aria-current={active ? 'page' : undefined}
-                          className={cn(
-                            'group/dot focus-visible:ring-ring relative inline-flex h-8 items-center rounded-full outline-none transition-[background-color,color,scale] duration-[var(--duration-fast)] before:absolute before:-inset-1.5 before:content-[""] active:scale-[0.94] focus-visible:ring-2 motion-reduce:active:scale-100',
-                            // A tint, not a filled block — two saturated slabs
-                            // side by side (launcher + active dot) read as noise.
-                            active
-                              ? 'bg-primary/15 text-primary'
-                              : 'text-muted-foreground hover:bg-glass-foreground/10 hover:text-glass-foreground',
-                          )}
-                          data-action="open-command-palette"
-                          data-entity={item.aiEntity ?? 'module'}
-                        >
-                          <span className="grid size-8 shrink-0 place-items-center">
-                            <Icon className="size-4" aria-hidden />
-                          </span>
-                          <span
-                            aria-hidden
-                            className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-[max-width,opacity,padding] duration-[var(--duration-base)] ease-[var(--ease-emphasized)] group-hover/dot:max-w-32 group-hover/dot:pr-2.5 group-hover/dot:opacity-100 group-focus-visible/dot:max-w-32 group-focus-visible/dot:pr-2.5 group-focus-visible/dot:opacity-100"
-                          >
-                            {item.label}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                  {overflow > 0 && (
-                    <li>
-                      <button
-                        type="button"
-                        onClick={() => setOpen(true)}
-                        className="text-muted-foreground hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-ring relative inline-flex size-8 items-center justify-center rounded-full outline-none transition-[background-color,color,scale] duration-[var(--duration-fast)] before:absolute before:-inset-1.5 before:content-[''] active:scale-[0.94] focus-visible:ring-2 motion-reduce:active:scale-100"
-                        aria-label={`${overflow} modül daha — komut merkezini aç`}
-                        data-action="open-command-palette"
-                        data-entity="command"
-                      >
-                        <MoreHorizontal className="size-4" aria-hidden />
-                      </button>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </nav>
+                panel is open, where the card grid supersedes it. A single sliding
+                highlight glides between the dots (see DockNavStrip). */}
+            <DockNavStrip
+              items={inlineItems}
+              overflowCount={overflow}
+              pathname={pathname}
+              onOpen={() => setOpen(true)}
+            />
           </div>
 
           {/* Thin divider, then the controls. Notifications stay in the resting

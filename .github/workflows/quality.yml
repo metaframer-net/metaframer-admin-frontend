@@ -37,3 +37,34 @@ jobs:
         run: node scripts/check-bundle-size.mjs
       - name: Build Storybook
         run: npm run build-storybook
+
+  # Real-app UI audit across the DESIGN_SYSTEM breakpoints (see docs/UI_GATE.md).
+  # Runs automatically on every push/PR over the routes discovered from the nav
+  # schema (`--nav`) — a new page added to the nav is covered with no manifest to
+  # maintain. Screenshots are uploaded as an artifact so failures are inspectable.
+  ui-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: UI audit (routes discovered from the nav schema)
+        # Non-blocking during rollout: flip `continue-on-error` to false (or make
+        # this job a required check in branch protection) once the audit is trusted.
+        continue-on-error: true
+        run: npm run ui:audit -- --nav
+      - name: Upload audit screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-audit-screenshots
+          path: .ui-audit/
+          if-no-files-found: ignore

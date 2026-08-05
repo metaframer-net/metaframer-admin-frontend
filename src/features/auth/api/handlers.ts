@@ -31,7 +31,7 @@ import {
 // ---------------------------------------------------------------------------
 
 let sessions = new Map<string, string>(); // session token -> user id
-let revokedTokens = new Set<string>(); // tokens invalidated by logout/refresh
+let revokedTokens = new Set<string>(); // tokens invalidated by an explicit logout only
 let challenges = new Map<string, string>(); // 2FA challenge token -> user id
 let setupChallenges = new Map<string, string>(); // mandatory-2FA setup token -> user id
 let resetTokens = new Map<string, string>(); // reset token -> email
@@ -129,8 +129,22 @@ function sessionsFor(userId: string): ActiveSession[] {
   return [current, ...(otherSessions.get(userId) ?? [])];
 }
 
+/**
+ * A per-tab-unique token nonce. MSW runs its request handlers (and this in-memory
+ * state) SEPARATELY in each browser tab, but the bearer token lives in shared
+ * localStorage. With only a per-tab `seq`, two tabs mint the IDENTICAL
+ * `mock-<user>-<n>` string — so one tab can treat another tab's freshly-minted
+ * token as its own previously-revoked one and 401 it, bouncing the user to
+ * /session-expired. A globally-unique nonce per tab makes cross-tab collisions
+ * impossible while leaving revocation semantics (logout, refresh grace) intact.
+ */
+const TAB_NONCE =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().replace(/-/g, '')
+    : Math.floor(Math.random() * 1e12).toString(36);
+
 function mintSession(userId: string): string {
-  const token = `mock-${userId}-${nextId()}`;
+  const token = `mock-${userId}-${nextId()}${TAB_NONCE}`;
   sessions.set(token, userId);
   return token;
 }
@@ -144,7 +158,9 @@ function userIdForToken(token: string | null): string | null {
   if (!token || revokedTokens.has(token)) return null;
   const mapped = sessions.get(token);
   if (mapped) return mapped;
-  const parsed = /^mock-(.+)-\d+$/.exec(token);
+  // Trailing segment is `<seq><TAB_NONCE>` (digits + optional alphanumerics), so
+  // accept alphanumerics — not just `\d+` — while still parsing the user id out.
+  const parsed = /^mock-(.+)-[0-9a-z]+$/.exec(token);
   return parsed ? parsed[1]! : null;
 }
 
@@ -466,8 +482,14 @@ export const authHandlers = [
     const token = bearer(request);
     const admin = adminForRequest(request);
     if (!admin || !token) return HttpResponse.json({ message: 'Oturum bulunamadı.' }, { status: 401 });
-    sessions.delete(token);
-    revokedTokens.add(token);
+    // Rotation is NON-destructive in this mock: mint a fresh token but DO NOT
+    // revoke the old one. MSW keeps its handler state per browser TAB while the
+    // token lives in SHARED localStorage, so revoking on refresh let one tab
+    // invalidate a token another tab was still using → a spurious 401 →
+    // /session-expired. A well-formed token now stays valid until an explicit
+    // logout; real session hardening belongs to the FastAPI backend, not this
+    // single-admin dev mock. Unique per-tab token nonces (see mintSession) keep
+    // rotated tokens distinct on top of this.
     const fresh = mintSession(admin.id);
     return HttpResponse.json({ token: fresh });
   }),

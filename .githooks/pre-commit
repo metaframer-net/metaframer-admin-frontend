@@ -1,0 +1,27 @@
+#!/bin/sh
+# Fast pre-commit backstop for the UI gate.
+#
+# This runs on EVERY commit and must stay fast, so it covers the deterministic
+# hard failures only: broken types, lint, and unit/interaction tests (the
+# Storybook browser project already renders every component in real Chromium).
+#
+# The THOROUGH browser audit — real-app drive across breakpoints, overflow /
+# off-screen / touch-target checks, and screenshots for visual review — is the
+# AGENT GATE, run per UI task before proposing a commit:
+#
+#     npm run ui:audit -- --route /listings
+#
+# See docs/UI_GATE.md. Enable this hook once with:
+#     git config core.hooksPath .githooks
+set -e
+
+echo "pre-commit: lint"
+npm run lint --silent
+
+echo "pre-commit: typecheck"
+npm run typecheck --silent
+
+echo "pre-commit: tests"
+npx vitest run --silent
+
+echo "pre-commit: OK"

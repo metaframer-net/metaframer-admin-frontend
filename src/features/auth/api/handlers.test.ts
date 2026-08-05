@@ -237,19 +237,20 @@ describe('auth handlers — account security', () => {
     expect(info.sessions.every((s) => s.current)).toBe(true);
   });
 
-  it('refreshes the token (old token stops working, new one works)', async () => {
+  it('refreshes the token (rotation is non-destructive; the old token stays valid)', async () => {
     const res = await authed();
     const old = res.token!;
     const { token: fresh } = await api.post<{ token: string }>('/auth/refresh');
     expect(fresh).not.toBe(old);
 
-    setAuthToken(old);
-    const err = await api.get('/auth/me').catch((e: unknown) => e);
-    expect((err as ApiError).status).toBe(401);
-
+    // Both the rotated-in token AND the previous one keep resolving: the mock
+    // never revokes on refresh, so a second tab (or an in-flight request) still
+    // carrying the old token is never spuriously signed out. Only an explicit
+    // logout invalidates a token — covered by the logout test above.
     setAuthToken(fresh);
-    const me = await api.get<{ role: string }>('/auth/me');
-    expect(me.role).toBe('moderator');
+    expect((await api.get<{ role: string }>('/auth/me')).role).toBe('moderator');
+    setAuthToken(old);
+    expect((await api.get<{ role: string }>('/auth/me')).role).toBe('moderator');
   });
 
   it('reauth accepts the correct password and rejects a wrong one', async () => {

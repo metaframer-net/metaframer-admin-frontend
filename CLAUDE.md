@@ -30,6 +30,7 @@ Enterprise admin panel for **arsam.net**, a Turkish real-estate-only classifieds
 6. **FieldHelp mandatory.** EVERY form field has an icon-only help affordance via `FieldHelp`, enforced by `FormField`. A field without help/helper text fails DoD.
 7. **Advanced tables mandatory.** Data tables follow the 10-point contract in `docs/DATA_TABLE_SPEC.md`.
 8. **Layout modes.** AppShell supports `sidebar` and `topnav`, driven by ONE nav schema, switchable at runtime, persisted per user.
+9. **Pre-commit UI gate.** After ANY UI task (component/page/visual change), before proposing a commit: run `npm run ui:audit -- --route <path>` (or `--story <id>`), READ the per-breakpoint screenshots in `.ui-audit/`, review with `ux-design-critic`, fix shift/overflow/mobile/ergonomic issues, re-audit until clean, THEN report. See `docs/UI_GATE.md`.
 
 ## Git Policy (HARD)
 - Claude Code MUST NEVER run git write operations: commit, push, tag, rebase, reset, merge, checkout, restore, clean, stash, cherry-pick, revert. Enforced as deny rules in `.claude/settings.json`.
