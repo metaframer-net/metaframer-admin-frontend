@@ -256,6 +256,10 @@
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.6, 1); /* symmetric — for looping/breathing motion */
+  /* Gentle glide — eases in AND out, softer than `--ease-emphasized`. For a
+     highlight that travels between siblings (the dock nav ink), where a purely
+     decelerating curve reads as arriving abruptly and a symmetric ease glides. */
+  --ease-soft: cubic-bezier(0.45, 0.05, 0.15, 1);
   /* Overshoot — settles slightly PAST the target and eases back. Reserved for a
      surface that flies in from off-screen (the edge dock stage), where a purely
      decelerating curve reads as the panel arriving already tired. Never use it on
@@ -310,6 +314,10 @@
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 260ms;
+  /* A touch longer than `--duration-slow` — for a highlight that GLIDES between
+     siblings (the dock nav ink + dot width), where the extra ~80ms is what reads
+     as "easy" rather than merely quick. Paired with `--ease-soft`. */
+  --duration-relaxed: 340ms;
   /* Long enough for an off-screen surface to travel its full distance and let
      `--ease-spring` settle. Only the edge-dock stage earns it — in-page state
      changes stay on fast/base/slow. */
@@ -563,6 +571,90 @@
     grid-template-columns: 0fr;
     opacity: 0;
     pointer-events: none;
+  }
+
+  /* ── Inline nav strip — sliding highlight (ink) ─────────────────────────────
+     A SINGLE highlight slides between the module dots and the hovered/focused dot
+     reveals its label. Both the slide and the label reveal are STATE-driven (the
+     active index), not per-dot `:hover`: the highlight is sticky, so travelling
+     across the gap between two dots never collapses it to nothing and re-expands
+     on the next — the old per-dot `max-width` reveal did, which read as the strip
+     jumping. Now it is one continuous glide from module to module. Dot widths and
+     the ink's transform/width are set imperatively in JS (measured label widths),
+     so `width`/`transform` interpolate in lockstep. Reduced motion collapses the
+     durations (base layer + the explicit rule below). */
+  .dock-dot {
+    transition: color var(--duration-base) var(--ease-soft);
+  }
+
+  /* The clip wrapper is the element whose width is driven imperatively (the label
+     unfolds inside it), so the width transition MUST live here — not on the button
+     — or the dot snaps to size while only the ink glides. It and the ink share one
+     duration (`--dock-glide`) so the dot and its highlight travel together.
+
+     `--dock-glide` is set per move in JS to keep the ink's SPEED roughly constant:
+     a hop to a neighbour finishes quickly, a sweep across the strip takes longer,
+     so every travel feels equally smooth instead of near = fast / far = slow. It
+     falls back to `--duration-relaxed` (rest, first appearance, collapse). */
+  .dock-dot-clip {
+    transition: width var(--dock-glide, var(--duration-relaxed)) var(--ease-soft);
+  }
+
+  .dock-dot-ink {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2rem; /* matches the h-8 dot */
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--glass-foreground) 10%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, width;
+    transition:
+      transform var(--dock-glide, var(--duration-relaxed)) var(--ease-soft),
+      width var(--dock-glide, var(--duration-relaxed)) var(--ease-soft),
+      opacity var(--duration-fast) var(--ease-soft);
+  }
+
+  /* Ink only shows while a dot is highlighted; at rest the strip is icon-only and
+     the active page keeps its own tint (on the dot itself, not the ink). */
+  [data-dock-strip][data-active='true'] .dock-dot-ink {
+    opacity: 1;
+  }
+
+  /* Asymmetric label motion: the ENTERING label settles in over `--duration-slow`
+     (a step ahead of the pill width, so the text reads as arriving into an already
+     moving pill), but the EXITING one leaves faster over `--duration-base` — a
+     label that lingers as the highlight moves on reads as sluggish. The duration
+     lives on each STATE, so the browser picks enter- vs exit-speed by the state
+     being transitioned TO. */
+  .dock-dot-label {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateX(-3px);
+    transition:
+      opacity var(--duration-base) var(--ease-soft),
+      filter var(--duration-base) var(--ease-soft),
+      transform var(--duration-base) var(--ease-soft);
+  }
+
+  .dock-dot[data-highlighted='true'] .dock-dot-label {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition-duration: var(--duration-slow);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dock-dot,
+    .dock-dot-clip,
+    .dock-dot-ink,
+    .dock-dot-label {
+      transition-duration: 0.01ms;
+    }
+    .dock-dot-label {
+      filter: none;
+    }
   }
 
   /* Keyboard-driven open/close (⌘K, Escape) skips the motion entirely — those are
