@@ -22,6 +22,8 @@ pnpm-debug.log*
 # Coverage / test
 coverage/
 .vitest/
+.vitest-attachments/
+.ui-audit/
 playwright-report/
 test-results/
 
