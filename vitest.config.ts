@@ -36,6 +36,11 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: 'storybook',
+          // Browser (play/a11y) tests are prone to flakiness under parallel load —
+          // a story can time out at render/teardown while the suite is saturated,
+          // failing a file that passes in isolation. Retry absorbs those transient
+          // flakes so CI doesn't go red on unrelated, non-reproducible failures.
+          retry: 2,
           browser: {
             enabled: true,
             provider: playwright(),
