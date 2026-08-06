@@ -87,7 +87,7 @@ export function ListingsListPage() {
           <h1 className="text-xl font-semibold sm:text-2xl">İlanlar</h1>
           <p className="text-muted-foreground text-sm">Konut, işyeri, arsa, devremülk ve turistik ilanları.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ListingsViewSwitch value={view} onChange={(v) => state.setView(v === 'table' ? null : v)} />
           <Button asChild variant="outline">
             <Link to="/listings/moderation" data-action="navigate" data-entity="listing">

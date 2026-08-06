@@ -46,7 +46,7 @@ export function ViewSwitch({ value, onChange, views = DATA_VIEWS, entity }: View
             aria-pressed={active}
             aria-label={label}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+              'relative inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors after:absolute after:-inset-1 after:content-[""]',
               active ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:text-foreground',
             )}
             data-action="switch-view"
