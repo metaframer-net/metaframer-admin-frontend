@@ -284,6 +284,10 @@
      protected (base layer collapses it to a single ~0ms cycle ending at scale(1), plus
      an explicit motion-reduce:animate-none on the element). */
   --animate-pulse-soft: pulse-soft 1.8s var(--ease-in-out) infinite;
+  /* Stronger heartbeat for the dock AI orb — a more pronounced lub-dub whose peak
+     grows well past the enclosing gray brand surface. Same reduced-motion
+     protection as pulse-soft (base-layer collapse + motion-reduce:animate-none). */
+  --animate-pulse-strong: pulse-strong 1.8s var(--ease-in-out) infinite;
 
   /* Live indicator halo — a dot expands and fades to mark "this reading is live"
      (the dock status chip's clock). Decorative: the element carrying it is
@@ -370,6 +374,21 @@
   }
   26% {
     transform: scale(1.04);
+  }
+}
+/* Stronger lub-dub for the dock AI orb — bigger peak so the beat visibly pushes
+   past the gray brand surface. Starts AND ends at scale(1) (reduced-motion safe). */
+@keyframes pulse-strong {
+  0%,
+  40%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.22);
+  }
+  26% {
+    transform: scale(1.08);
   }
 }
 /* Live halo — the ring grows past the core and fades out, then rests. */
