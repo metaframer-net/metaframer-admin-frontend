@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search } from 'lucide-react';
 
@@ -50,11 +50,12 @@ export function MobileBottomNav() {
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
   const isDragging = useRef(false);
   const animating = useRef(false);
+  const [draggingState, setDraggingState] = useState(false);
 
-  const allItems = [
+  const allItems = useMemo(() => [
     ...primary.map((item) => ({ id: item.id, to: item.to, icon: item.icon, label: item.label.split(' ')[0]!, aiEntity: item.aiEntity, type: 'nav' as const })),
     { id: '__search', to: '', icon: Search, label: 'Ara', aiEntity: 'command', type: 'action' as const },
-  ];
+  ], [primary]);
 
   const activeIdx = primary.findIndex((item) => isNavItemActive(item.to, pathname));
 
@@ -76,7 +77,10 @@ export function MobileBottomNav() {
     if (pos) setPill(pos);
   }, [activeIdx, primary, measureTab]);
 
-  useLayoutEffect(syncPill, [syncPill]);
+  useEffect(() => {
+    const id = requestAnimationFrame(syncPill);
+    return () => cancelAnimationFrame(id);
+  }, [syncPill]);
   useEffect(() => {
     window.addEventListener('resize', syncPill);
     return () => window.removeEventListener('resize', syncPill);
@@ -99,6 +103,7 @@ export function MobileBottomNav() {
     const touch = e.touches[0];
     if (!touch) return;
     isDragging.current = true;
+    setDraggingState(true);
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
     if (!el) return;
     const tab = el.closest<HTMLElement>('[data-nav-id]');
@@ -111,6 +116,7 @@ export function MobileBottomNav() {
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!isDragging.current) return;
     isDragging.current = false;
+    setDraggingState(false);
     const touch = e.changedTouches[0];
     if (!touch) { syncPill(); return; }
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -140,7 +146,7 @@ export function MobileBottomNav() {
         <div
           className={cn(
             'bg-foreground/10 absolute top-1 bottom-1 rounded-2xl',
-            isDragging.current ? 'transition-none' : 'transition-[left,width] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
+            draggingState ? 'transition-none' : 'transition-[left,width] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
           )}
           style={{ left: pill.left, width: pill.width }}
           aria-hidden

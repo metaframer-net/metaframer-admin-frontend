@@ -52,11 +52,12 @@ export function DockShell({ children, now }: DockShellProps) {
   const [settled, setSettled] = useState(!open);
   useEffect(() => {
     if (open) {
-      setSettled(false);
+      const raf = requestAnimationFrame(() => setSettled(false));
       const id = setTimeout(() => setSettled(true), 520);
-      return () => clearTimeout(id);
+      return () => { cancelAnimationFrame(raf); clearTimeout(id); };
     }
-    setSettled(false);
+    const raf = requestAnimationFrame(() => setSettled(false));
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   // Deferred focus — two rAFs so the clip-path animation paints first.
