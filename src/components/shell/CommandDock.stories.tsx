@@ -124,19 +124,18 @@ export const InlineNav: Story = {
     await expect(farDur).toBeLessThanOrEqual(380); // clamp ceiling
     await expect(farDur).toBeGreaterThan(nearDur); // farther ⇒ longer
 
-    // Snap-regression guard: the width transition lives on the element that actually
-    // resizes (the clip), so it is a real, non-zero transition — not an instant jump
-    // with only the ink gliding.
-    const clipDur = parseFloat(getComputedStyle(farDot.querySelector('.dock-dot-clip') as Element).transitionDuration);
-    await expect(clipDur).toBeGreaterThan(0.19);
-    await expect(clipDur).toBeLessThanOrEqual(0.38);
+    // Snap-regression guard: the ink is the element that resizes + slides, so its
+    // transition is a real, glide-paced move — not an instant jump.
+    const ink = strip?.querySelector('.dock-ink') as Element;
+    const inkDur = parseFloat(getComputedStyle(ink).transitionDuration);
+    await expect(inkDur).toBeGreaterThan(0.19);
+    await expect(inkDur).toBeLessThanOrEqual(0.38);
 
-    // Asymmetric label: the highlighted (entering) label settles slower than a
-    // resting one leaves. nearDot is highlighted now; overview is at rest.
-    const lblDur = (el: Element) =>
-      getComputedStyle(el.querySelector('.dock-dot-label') as Element).transitionDuration;
-    await expect(lblDur(nearDot)).toContain('0.26s'); // enter → --duration-slow
-    await expect(lblDur(overview)).toContain('0.18s'); // rest/exit → --duration-base
+    // The module name springs out in ONE pill below the row (fixed dots never
+    // unfold inline) and reads the highlighted dot's label. nearDot is highlighted.
+    const name = document.body.querySelector('.dock-nav-name') as HTMLElement;
+    await expect(name).toHaveAttribute('data-shown', 'true');
+    await expect(name.textContent).toBe(nearDot.getAttribute('aria-label'));
 
     // Overflow chip is a full participant in the sliding highlight: crossing from
     // the last module onto it must NOT collapse the ink (the old "close then open"
@@ -167,7 +166,7 @@ export const InlineNav: Story = {
 /**
  * Stage 3 — the panel unfolds INSIDE the pill: the pill row stays put, the
  * surface rounds and grows downward. It is a modal dialog, so focus moves to the
- * close control and is trapped, the page behind is scroll-locked, and Escape
+ * "Ara… Sor…" search and is trapped, the page behind is scroll-locked, and Escape
  * hands focus back to the pill.
  */
 export const PanelOpen: Story = {
@@ -181,8 +180,9 @@ export const PanelOpen: Story = {
     // The pill row is NOT replaced — the panel lives in the same surface.
     await expect(pill).toBeVisible();
     await expect(pill).toHaveAttribute('aria-expanded', 'true');
-    // Modal contract: initial focus + scroll lock.
-    await expect(body.getByRole('button', { name: 'Kapat' })).toHaveFocus();
+    // Modal contract: initial focus lands on the "Ara… Sor…" search (search-first)
+    // + scroll lock.
+    await expect(within(dialog).getByPlaceholderText('Ara… Sor…')).toHaveFocus();
     await expect(document.body).toHaveStyle({ overflow: 'hidden' });
     // The panel carries the card grid.
     await expect(within(dialog).getByRole('button', { name: /^İlanlar$/ })).toBeInTheDocument();

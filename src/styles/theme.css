@@ -573,44 +573,42 @@
     flex: none;
   }
 
+  /* On open the per-dot "train" carries the fade (staggered), so the lane keeps
+     its opacity and only its WIDTH collapses — and that collapse is delayed so the
+     dots visibly slide out first, THEN the empty lane closes. */
   .dock-pill[data-open='true'] .dock-reveal-nav {
     grid-template-columns: 0fr;
-    opacity: 0;
     pointer-events: none;
+    transition-delay: var(--duration-slow);
   }
 
-  /* ── Inline nav strip — sliding highlight (ink) ─────────────────────────────
-     A SINGLE highlight slides between the module dots and the hovered/focused dot
-     reveals its label. Both the slide and the label reveal are STATE-driven (the
-     active index), not per-dot `:hover`: the highlight is sticky, so travelling
-     across the gap between two dots never collapses it to nothing and re-expands
-     on the next — the old per-dot `max-width` reveal did, which read as the strip
-     jumping. Now it is one continuous glide from module to module. Dot widths and
-     the ink's transform/width are set imperatively in JS (measured label widths),
-     so `width`/`transform` interpolate in lockstep. Reduced motion collapses the
-     durations (base layer + the explicit rule below). */
+  /* ── Nav strip — FIXED icon dots + sliding ink + a below-row name pill ───────
+     The dots NEVER move or resize, so the pointer can never miss one and nothing
+     shifts (the old design unfolded each dot's label INLINE, which pushed its
+     neighbours and squeezed the status text). A single "ink" slides behind the
+     hovered/active dot — its speed is kept roughly constant by the JS-set
+     `--dock-glide` — and the module name springs out SIDEWAYS in a pill placed
+     BELOW the row, so it never covers the next icon. State-driven, sticky, grace. */
+  .dock-strip {
+    position: relative;
+  }
   .dock-dot {
-    transition: color var(--duration-base) var(--ease-soft);
+    /* Colour changes on hover immediately; transform/opacity carry the "train"
+       exit and are the only properties that take the per-dot stagger delay. The
+       fade is slow enough (base) that each dot is still visible as it SLIDES out,
+       so the exit reads as a train pulling away rather than a blink. */
+    transition:
+      color var(--duration-base) var(--ease-soft),
+      background-color var(--duration-fast) var(--ease-soft),
+      transform var(--duration-slow) var(--ease-emphasized) var(--dot-delay, 0ms),
+      opacity var(--duration-slow) var(--ease-emphasized) var(--dot-delay, 0ms);
   }
 
-  /* The clip wrapper is the element whose width is driven imperatively (the label
-     unfolds inside it), so the width transition MUST live here — not on the button
-     — or the dot snaps to size while only the ink glides. It and the ink share one
-     duration (`--dock-glide`) so the dot and its highlight travel together.
-
-     `--dock-glide` is set per move in JS to keep the ink's SPEED roughly constant:
-     a hop to a neighbour finishes quickly, a sweep across the strip takes longer,
-     so every travel feels equally smooth instead of near = fast / far = slow. It
-     falls back to `--duration-relaxed` (rest, first appearance, collapse). */
-  .dock-dot-clip {
-    transition: width var(--dock-glide, var(--duration-relaxed)) var(--ease-soft);
-  }
-
-  .dock-dot-ink {
+  .dock-ink {
     position: absolute;
     left: 0;
     top: 0;
-    height: 2rem; /* matches the h-8 dot */
+    height: 2rem; /* matches the size-8 dot */
     border-radius: 9999px;
     background: color-mix(in oklab, var(--glass-foreground) 10%, transparent);
     opacity: 0;
@@ -621,45 +619,63 @@
       width var(--dock-glide, var(--duration-relaxed)) var(--ease-soft),
       opacity var(--duration-fast) var(--ease-soft);
   }
-
-  /* Ink only shows while a dot is highlighted; at rest the strip is icon-only and
-     the active page keeps its own tint (on the dot itself, not the ink). */
-  [data-dock-strip][data-active='true'] .dock-dot-ink {
+  [data-dock-strip][data-active='true'] .dock-ink {
     opacity: 1;
   }
 
-  /* Asymmetric label motion: the ENTERING label settles in over `--duration-slow`
-     (a step ahead of the pill width, so the text reads as arriving into an already
-     moving pill), but the EXITING one leaves faster over `--duration-base` — a
-     label that lingers as the highlight moves on reads as sluggish. The duration
-     lives on each STATE, so the browser picks enter- vs exit-speed by the state
-     being transitioned TO. */
-  .dock-dot-label {
+  /* The module name — a pill BELOW the row. Rendered OUTSIDE the strip's reveal so
+     the reveal's `overflow: hidden` (its width-unfold clip) can't shave it; JS
+     places it under the highlighted dot (`translate`) and it springs out sideways
+     (`scaleX`). It slides with the ink between dots and never overlaps an icon. */
+  .dock-nav-name {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 30;
+    white-space: nowrap;
+    padding: 0.3125rem 0.625rem;
+    border-radius: var(--radius-md);
+    background: var(--glass);
+    color: var(--glass-foreground);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-lg);
+    font-size: 0.75rem;
+    font-weight: 550;
+    line-height: 1;
     opacity: 0;
-    filter: blur(2px);
-    transform: translateX(-3px);
+    pointer-events: none;
+    transform-origin: left center;
+    will-change: transform, opacity;
     transition:
-      opacity var(--duration-base) var(--ease-soft),
-      filter var(--duration-base) var(--ease-soft),
-      transform var(--duration-base) var(--ease-soft);
+      transform var(--dock-glide, var(--duration-relaxed)) var(--ease-soft),
+      opacity var(--duration-fast) var(--ease-soft);
+  }
+  .dock-nav-name[data-shown='true'] {
+    opacity: 1;
   }
 
-  .dock-dot[data-highlighted='true'] .dock-dot-label {
-    opacity: 1;
-    filter: none;
-    transform: none;
-    transition-duration: var(--duration-slow);
+  /* ── "Train" exit — on open the dots slide left and fade, front car first. ── */
+  .dock-pill[data-open='true'] .dock-dot {
+    transform: translateX(-2.75rem);
+    opacity: 0;
+    will-change: transform, opacity;
   }
+  .dock-pill[data-open='true'] .dock-nav-name {
+    opacity: 0;
+  }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(2) .dock-dot { --dot-delay: 0ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(3) .dock-dot { --dot-delay: 45ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(4) .dock-dot { --dot-delay: 90ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(5) .dock-dot { --dot-delay: 135ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(6) .dock-dot { --dot-delay: 180ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(7) .dock-dot { --dot-delay: 225ms; }
+  .dock-pill[data-open='true'] .dock-strip > li:nth-child(8) .dock-dot { --dot-delay: 270ms; }
 
   @media (prefers-reduced-motion: reduce) {
     .dock-dot,
-    .dock-dot-clip,
-    .dock-dot-ink,
-    .dock-dot-label {
+    .dock-ink,
+    .dock-nav-name {
       transition-duration: 0.01ms;
-    }
-    .dock-dot-label {
-      filter: none;
     }
   }
 
@@ -907,24 +923,6 @@
     }
   }
 
-  /* ── Dock nav strip "train" exit ──
-     When the panel opens the preview strip slides LEFT and fades as it collapses,
-     so the icons read as pulling out of the way for the card grid (rather than
-     just blinking out). The width collapse is the existing `.dock-reveal-nav`
-     rule; this adds the leftward travel. */
-  .dock-reveal-nav > * {
-    transition:
-      transform var(--duration-base) var(--ease-emphasized),
-      opacity var(--duration-fast) var(--ease-emphasized);
-  }
-  .dock-pill[data-open='true'] .dock-reveal-nav > * {
-    transform: translateX(-1.75rem);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .dock-pill[data-open='true'] .dock-reveal-nav > * {
-      transform: none;
-    }
-  }
 
   /* Below xl the dock is the ONLY command surface (no more mobile island), so the
      pill spans the viewport (minus a small inset) at every stage — closed, engaged
