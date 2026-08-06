@@ -23,6 +23,13 @@ export interface AiAskButtonProps extends Omit<ComponentProps<'button'>, 'childr
   label?: string;
   /** Diameter in px. */
   size?: number;
+  /**
+   * Busy state: swaps the label for `loadingLabel` and spins the sparkle icon
+   * (mirrors the reference button's "Thinking" state).
+   */
+  loading?: boolean;
+  /** Label shown while `loading`. */
+  loadingLabel?: string;
 }
 
 /**
@@ -30,10 +37,14 @@ export interface AiAskButtonProps extends Omit<ComponentProps<'button'>, 'childr
  * accessible name (the sparkle + dot field are decorative). Carries the
  * `data-action`/`data-entity` AI-first hooks by default; callers wire `onClick`
  * to open the assistant. Positioning (e.g. `fixed`) is passed via `className`.
+ * The cursor-tracking dot field, glow, glass sheen, ring and shine mirror the
+ * reference button's effect, re-derived in OUR tokens.
  */
 export function AiAskButton({
   label = 'Ask AI',
   size = 84,
+  loading = false,
+  loadingLabel = 'Thinking',
   className,
   style,
   ...props
@@ -42,10 +53,11 @@ export function AiAskButton({
     <button
       type="button"
       aria-haspopup="dialog"
+      aria-busy={loading || undefined}
       data-action="open-assistant"
       data-entity="assistant"
       {...props}
-      className={cn('ask-btn', className)}
+      className={cn('ask-btn', loading && 'is-loading', className)}
       style={{ '--ask-size': `${size}px`, ...style } as CSSProperties}
     >
       <span className="ask-btn__dots" aria-hidden="true">
@@ -55,10 +67,10 @@ export function AiAskButton({
       <span className="ask-btn__ring" aria-hidden="true" />
       <span className="ask-btn__shine" aria-hidden="true" />
       <span className="ask-btn__content">
-        <span className="ask-btn__icon" aria-hidden="true">
+        <span className={cn('ask-btn__icon', loading && 'is-spinning')} aria-hidden="true">
           <SparkleGlyph />
         </span>
-        <span className="ask-btn__label">{label}</span>
+        <span className="ask-btn__label">{loading ? loadingLabel : label}</span>
       </span>
     </button>
   );

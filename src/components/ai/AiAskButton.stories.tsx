@@ -62,6 +62,15 @@ export const OnDarkSurface: Story = {
   ],
 };
 
+export const Loading: Story = {
+  args: { loading: true },
+  play: async ({ canvas }) => {
+    // While busy the label swaps to the loading copy and the button flags aria-busy.
+    const btn = canvas.getByRole('button', { name: /thinking/i });
+    await expect(btn).toHaveAttribute('aria-busy', 'true');
+  },
+};
+
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };

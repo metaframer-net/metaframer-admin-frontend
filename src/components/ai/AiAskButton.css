@@ -23,6 +23,8 @@
   --ask-glow: color-mix(in oklab, var(--primary) 28%, transparent);
   --ask-dot-from: color-mix(in oklab, var(--primary) 60%, transparent);
   --ask-dot-to: color-mix(in oklab, var(--accent) 45%, transparent);
+  /* Center color of the soft glow that tracks the cursor across the dot field. */
+  --ask-dot-glow: color-mix(in oklab, var(--primary) 50%, transparent);
 
   position: relative;
   width: var(--ask-size, 84px);
@@ -153,14 +155,18 @@
 
 .ask-btn__icon {
   color: var(--ask-icon);
-  filter: drop-shadow(0 0 10px var(--ask-icon-glow));
+  filter: drop-shadow(0 0 12px var(--ask-icon-glow));
   transition: transform 500ms ease;
   display: grid;
   place-items: center;
 }
 
-.ask-btn:hover .ask-btn__icon {
+.ask-btn:hover .ask-btn__icon:not(.is-spinning) {
   transform: rotate(12deg) scale(1.1);
+}
+
+.ask-btn__icon.is-spinning {
+  animation: ask-spin 1.4s linear infinite;
 }
 
 .ask-btn__icon svg {
@@ -177,6 +183,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  text-shadow: 0 4px 20px var(--ask-glow);
 }
 
 @keyframes ask-shine {
@@ -185,6 +192,12 @@
   }
   100% {
     left: 120%;
+  }
+}
+
+@keyframes ask-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -197,8 +210,11 @@
   .ask-btn:hover {
     transform: none;
   }
-  .ask-btn:hover .ask-btn__icon {
+  .ask-btn:hover .ask-btn__icon:not(.is-spinning) {
     transform: none;
+  }
+  .ask-btn__icon.is-spinning {
+    animation: none;
   }
   .ask-btn:hover .ask-btn__shine {
     opacity: 0;
