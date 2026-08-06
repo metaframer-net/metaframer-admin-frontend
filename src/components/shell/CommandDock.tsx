@@ -490,7 +490,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
             their handler so this never double-fires. The keyboard path stays the
             real brand button below, so this adds no second tab stop. */}
         <div
-          className="flex items-center gap-2 px-2 py-1.5"
+          className="flex items-stretch gap-2 pr-2"
           onClick={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('[data-dock-exclude]') || target.closest('button')) return;
@@ -502,7 +502,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
               ref={pillRef}
               type="button"
               onClick={() => setOpen(!open)}
-              className="hover:bg-glass-foreground/10 inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] motion-reduce:active:scale-100"
+              className="hover:bg-glass-foreground/10 inline-flex min-h-14 min-w-0 items-center gap-1.5 self-stretch rounded-full pl-0 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] motion-reduce:active:scale-100"
               aria-label={`arsam.net · Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
               aria-keyshortcuts="Meta+K Control+K"
               aria-haspopup="dialog"
@@ -510,7 +510,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
               data-action="open-command-palette"
               data-entity="command"
             >
-              <DockLogo className="size-7 shrink-0" />
+              <DockLogo className="size-14 shrink-0" />
               {/* Brand text is desktop-only. On desktop the verbose status (page,
                   clock, ⌘K) is decluttered out of the collapsed state and springs
                   back on hover/focus; on mobile (coarse pointer) the reveal is
