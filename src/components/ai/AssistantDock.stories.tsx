@@ -6,8 +6,7 @@ import { expect, screen, userEvent } from 'storybook/test';
 
 import { listingKeys } from '@/features/listings/api/queries';
 import type { Listing } from '@/features/listings';
-import { resetAssistant } from '@/lib/ai';
-import { CommandPaletteProvider } from '@/components/shell/command-palette-context';
+import { resetAssistant, setAssistantOpen } from '@/lib/ai';
 import { AssistantDock } from './AssistantDock';
 import { AI_QUEUE_QUERY } from './assistant-context';
 
@@ -21,14 +20,18 @@ const QUEUE: Listing[] = [
 ];
 
 /**
- * In the app AssistantDock always lives inside CommandPaletteProvider (AppShell),
- * which it reads to hide the launcher while the command center is open. Every
- * story mounts it through this wrapper so that context is present.
+ * The standalone floating launcher was retired: the dock's AI orb logo now opens
+ * the command center, and the assistant Sheet is opened imperatively (⌘K / the
+ * command palette in the app). Stories drive it via a plain trigger button so the
+ * Sheet's data states stay coverable.
  */
 const Dock = () => (
-  <CommandPaletteProvider>
+  <>
+    <button type="button" onClick={() => setAssistantOpen(true)}>
+      Asistanı aç
+    </button>
     <AssistantDock />
-  </CommandPaletteProvider>
+  </>
 );
 
 function renderDock(): ReactElement {
@@ -67,14 +70,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   play: async ({ canvas }) => {
-    // The floating launcher is the visible affordance.
-    await expect(canvas.getByRole('button', { name: /ask ai/i })).toBeInTheDocument();
+    // The Sheet is closed at rest; the trigger opens it.
+    await expect(canvas.getByRole('button', { name: 'Asistanı aç' })).toBeInTheDocument();
   },
 };
 
 export const Open: Story = {
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Asistanı aç' }));
     // Sheet content is portaled to document.body.
     await expect(await screen.findByRole('dialog')).toBeInTheDocument();
     await expect(screen.getByText('AI Asistanı')).toBeInTheDocument();
@@ -104,7 +107,7 @@ export const Loading: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Asistanı aç' }));
     await expect(await screen.findByText('Moderasyon kopilotu')).toBeInTheDocument();
   },
 };
@@ -132,7 +135,7 @@ export const Empty: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Asistanı aç' }));
     await expect(await screen.findByText('Onay bekleyen AI-OK ilan yok.')).toBeInTheDocument();
   },
 };
@@ -161,7 +164,7 @@ export const Error: Story = {
     );
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Asistanı aç' }));
     await expect(await screen.findByText('Kuyruk alınamadı')).toBeInTheDocument();
   },
 };
@@ -169,48 +172,7 @@ export const Error: Story = {
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole('button', { name: /ask ai/i }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Asistanı aç' }));
     await expect(await screen.findByRole('dialog')).toBeInTheDocument();
-  },
-};
-
-/**
- * With the command center open (mobile dock-island / desktop backdrop both at
- * z-40), the floating launcher must NOT paint over it — it fades out and goes
- * inert/aria-hidden so it neither overlaps nor traps focus. Regression for the
- * mobile "Ask AI orb overlaps the open panel" bug.
- */
-export const HiddenWhenCommandCenterOpen: Story = {
-  render: () => {
-    const qc = new QueryClient({
-      defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false, retryOnMount: false } },
-    });
-    const router = createMemoryRouter(
-      [
-        {
-          path: '/listings',
-          element: (
-            <CommandPaletteProvider defaultOpen>
-              <AssistantDock />
-            </CommandPaletteProvider>
-          ),
-          handle: { routeMeta: { title: 'İlanlar', permission: 'listing.view', aiEntity: 'listing' } },
-        },
-      ],
-      { initialEntries: ['/listings'] },
-    );
-    return (
-      <QueryClientProvider client={qc}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    );
-  },
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
-  play: async ({ canvas }) => {
-    // aria-hidden removes it from the tree, so query it as a hidden element.
-    const btn = canvas.getByRole('button', { name: /ask ai/i, hidden: true });
-    const wrap = btn.closest('.fixed');
-    await expect(wrap).toHaveClass(/opacity-0/);
-    await expect(wrap).toHaveAttribute('inert');
   },
 };

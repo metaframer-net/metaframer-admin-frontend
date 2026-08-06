@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useId, useRef } from 'react';
 
 const TWO_PI = Math.PI * 2;
 
@@ -11,12 +11,16 @@ export interface DotFieldProps {
   cursorRadius?: number;
   /** How far dots bulge away from the cursor. */
   bulgeStrength?: number;
+  /** Radius (px) of the soft glow that tracks the cursor. */
+  glowRadius?: number;
   /**
    * CSS custom properties (resolved at runtime) used as the two gradient stops.
    * They MUST reference semantic tokens so the field re-tints with the theme.
    */
   fromVar?: string;
   toVar?: string;
+  /** Token-referencing color for the cursor-tracking glow (center stop). */
+  glowVar?: string;
   className?: string;
 }
 
@@ -38,24 +42,30 @@ function resolveColor(expr: string, anchor: HTMLElement): string {
 /**
  * Canvas dot grid that bulges away from the cursor — the animated fill behind the
  * AI "Ask AI" launcher. Ported to TS from the reference `DotField`, re-tinted to
- * OUR tokens (no hardcoded colors: gradient stops resolve `--primary`/`--accent`
- * at runtime and re-resolve on theme change). Honors `prefers-reduced-motion`
- * (renders a static grid, no RAF / no listeners) and pauses when the tab hides.
+ * OUR tokens (no hardcoded colors: gradient + glow stops resolve `--primary`/
+ * `--accent` at runtime and re-resolve on theme change). A soft radial glow
+ * tracks the cursor, fading in with movement (engagement) just like the source.
+ * Honors `prefers-reduced-motion` (renders a static grid, no glow, no RAF / no
+ * listeners) and pauses when the tab hides.
  */
 export const DotField = memo(function DotField({
-  dotRadius = 1.5,
-  dotSpacing = 11,
-  cursorRadius = 220,
-  bulgeStrength = 44,
+  dotRadius = 1.2,
+  dotSpacing = 10,
+  cursorRadius = 200,
+  bulgeStrength = 40,
+  glowRadius = 90,
   fromVar = 'var(--ask-dot-from)',
   toVar = 'var(--ask-dot-to)',
+  glowVar = 'var(--ask-dot-glow)',
   className,
 }: DotFieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glowRef = useRef<SVGCircleElement>(null);
+  const glowId = useId().replace(/[:]/g, '');
   // Keep the latest tuning props available to the animation loop without
   // re-subscribing listeners on every render.
-  const propsRef = useRef({ dotRadius, dotSpacing, cursorRadius, bulgeStrength, fromVar, toVar });
-  propsRef.current = { dotRadius, dotSpacing, cursorRadius, bulgeStrength, fromVar, toVar };
+  const propsRef = useRef({ dotRadius, dotSpacing, cursorRadius, bulgeStrength, fromVar, toVar, glowVar });
+  propsRef.current = { dotRadius, dotSpacing, cursorRadius, bulgeStrength, fromVar, toVar, glowVar };
 
   useEffect(() => {
     const canvasEl = canvasRef.current;
@@ -65,6 +75,7 @@ export const DotField = memo(function DotField({
     // Capture the narrowed (non-null) values so the closures below stay typed.
     const cv = canvasEl;
     const ctx = context;
+    const glowEl = glowRef.current;
 
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let reduced = motionQuery.matches;
@@ -75,13 +86,21 @@ export const DotField = memo(function DotField({
     const size = { w: 0, h: 0, offsetX: 0, offsetY: 0 };
     const mouse = { x: -9999, y: -9999, prevX: -9999, prevY: -9999, speed: 0 };
     let engagement = 0;
+    let glowAlpha = 0;
     let raf = 0;
-    let colors = { from: '#000', to: '#000' };
+    let colors = { from: '#000', to: '#000', glow: '#000' };
 
     function refreshColors() {
       const p = propsRef.current;
       const anchor = cv.parentElement ?? cv;
-      colors = { from: resolveColor(p.fromVar, anchor), to: resolveColor(p.toVar, anchor) };
+      colors = {
+        from: resolveColor(p.fromVar, anchor),
+        to: resolveColor(p.toVar, anchor),
+        glow: resolveColor(p.glowVar, anchor),
+      };
+      // Push the resolved center color into the SVG radial gradient stop.
+      const stop = document.getElementById(`${glowId}-stop`);
+      if (stop) stop.setAttribute('stop-color', colors.glow);
     }
 
     function buildDots() {
@@ -155,6 +174,14 @@ export const DotField = memo(function DotField({
       if (engagement < 0.001) engagement = 0;
       const eng = engagement;
 
+      // Soft glow tracks the cursor and fades in with engagement.
+      glowAlpha += (eng - glowAlpha) * 0.08;
+      if (glowEl) {
+        glowEl.setAttribute('cx', String(mouse.x));
+        glowEl.setAttribute('cy', String(mouse.y));
+        glowEl.style.opacity = String(glowAlpha);
+      }
+
       ctx.clearRect(0, 0, size.w, size.h);
       const grad = ctx.createLinearGradient(0, 0, size.w, size.h);
       grad.addColorStop(0, colors.from);
@@ -217,6 +244,7 @@ export const DotField = memo(function DotField({
         stop();
         window.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('visibilitychange', onVisibility);
+        if (glowEl) glowEl.style.opacity = '0';
         paintStatic();
       } else {
         window.addEventListener('mousemove', onMouseMove, { passive: true });
@@ -246,13 +274,34 @@ export const DotField = memo(function DotField({
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [glowId]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={className}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className={className}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+      />
+      <svg
+        aria-hidden="true"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      >
+        <defs>
+          <radialGradient id={glowId}>
+            <stop id={`${glowId}-stop`} offset="0%" stopColor="transparent" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
+        </defs>
+        <circle
+          ref={glowRef}
+          cx={-9999}
+          cy={-9999}
+          r={glowRadius}
+          fill={`url(#${glowId})`}
+          style={{ opacity: 0, willChange: 'opacity' }}
+        />
+      </svg>
+    </>
   );
 });

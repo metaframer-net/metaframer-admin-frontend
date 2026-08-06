@@ -76,9 +76,10 @@ export const DockMobile: Story = {
     // The mobile bottom nav is intentionally absent in dock mode.
     await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
     // The floating command pill's launcher carries navigation instead.
-    await expect(canvas.getByRole('button', { name: 'Menü ve komut aramayı aç' })).toBeInTheDocument();
-    // Edge nav docks render (their hint tabs are reachable).
-    await expect(canvas.getAllByRole('button', { name: /Gezinme dock.*aç/ }).length).toBeGreaterThan(0);
+    await expect(canvas.getByRole('button', { name: /menü ve komut aramayı aç/i })).toBeInTheDocument();
+    // Edge nav docks are DESKTOP-only now (hidden below xl), so their hint tabs are
+    // not reachable on mobile — the command pill is the sole navigation surface.
+    await expect(canvas.queryByRole('button', { name: /Gezinme dock.*aç/ })).toBeNull();
   },
 };
 

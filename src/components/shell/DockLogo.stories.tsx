@@ -14,17 +14,22 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The dock-mode launcher logo carries a slow breathing pulse. The play test asserts
- * the motion CLASS wiring (not the animation timing) + that it's decorative, so it's
- * independent of animation duration and stable under reduced motion.
+ * The dock-mode launcher logo is the icon-only liquid-glass AI orb with a heartbeat
+ * (lub-dub) pulse. The play test asserts the orb wiring (root class + centered
+ * sparkle), the pulse class wiring (stable under reduced motion), and that it's
+ * decorative; the adjacent brand button carries the accessible name.
  */
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const logo = canvasElement.querySelector('[data-slot="dock-logo"]');
     await expect(logo).not.toBeNull();
-    // Breathing pulse is applied via the token-backed utility…
-    await expect(logo).toHaveClass('animate-pulse-soft');
-    // …and explicitly disabled under reduced motion.
+    // The liquid-glass orb root…
+    await expect(logo).toHaveClass('ask-orb');
+    // …renders the centered sparkle icon.
+    await expect(logo?.querySelector('.ask-btn__icon svg')).not.toBeNull();
+    // Heartbeat pulse is applied via the token-backed utility, and disabled under
+    // reduced motion.
+    await expect(logo).toHaveClass('animate-pulse-strong');
     await expect(logo).toHaveClass('motion-reduce:animate-none');
     // Decorative — the adjacent "arsam" label carries the accessible name.
     await expect(logo).toHaveAttribute('aria-hidden', 'true');

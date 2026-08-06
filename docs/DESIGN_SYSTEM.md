@@ -101,6 +101,15 @@ All text/background pairs are chosen for WCAG 2.2 AA (>= 4.5:1 body, >= 3:1 larg
 ## Spacing scale
 4px base: `0,1(4),2(8),3(12),4(16),5(20),6(24),8(32),10(40),12(48),16(64)`.
 
+### Spacing hard limits (HARD — enforced project-wide)
+Tight, deliberate spacing is a committed product decision. These caps apply to EVERY component, not just the dock:
+- **No margin exceeds 12px** anywhere (desktop AND mobile). Use gaps/borders for larger visual separation, never margin.
+- **No card padding and no container padding exceeds 12px.**
+- **Open command-center / dock cards: height ≤ 100px** (mobile AND desktop). Keep cards horizontal/compact (icon + ≤2-line title) rather than tall.
+- **Mobile card grids: zero gap** — tiles packed edge-to-edge with hairline dividers, not spacing.
+
+Loose paddings/margins read as off-brand; when a layout needs more air, restructure (grid, dividers, hierarchy) instead of widening spacing past 12px.
+
 ## Radii
 `--radius: 0.625rem`; derive `sm = radius-4px`, `md = radius-2px`, `lg = radius`, `xl = radius+4px`. Inputs/cards use md/lg; pills use full.
 

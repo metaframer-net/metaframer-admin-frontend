@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LogOut, ShieldCheck, UserCog } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,7 +29,7 @@ function initials(name: string): string {
 }
 
 /** Current-user menu. In dev it also exposes a role switcher to preview RBAC gating. */
-export function UserMenu() {
+export function UserMenu({ className }: { className?: string }) {
   const { user, setRole } = useSession();
   const logout = useLogout();
   return (
@@ -37,7 +38,7 @@ export function UserMenu() {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full"
+          className={cn('rounded-full', className)}
           aria-label="Kullanıcı menüsü"
           data-action="open-user-menu"
           data-entity="user"
@@ -47,7 +48,7 @@ export function UserMenu() {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-56 max-w-[calc(100vw-1rem)]">
         <DropdownMenuLabel>
           <div className="flex flex-col">
             <span className="text-sm font-medium text-foreground">{user.name}</span>

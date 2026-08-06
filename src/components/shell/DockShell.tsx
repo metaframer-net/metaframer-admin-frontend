@@ -1,18 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useMatches } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { type ReactNode } from 'react';
 
-import { cn } from '@/lib/utils';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
 import { Scrim } from '@/components/ui/scrim';
 import { hasRouteMeta } from '@/app/route-meta';
 import { CommandDock } from './CommandDock';
-import { CommandCenter } from './CommandCenter';
-import { DockLogo } from './DockLogo';
 import { EdgeDock } from './EdgeDock';
-import { NotificationBell } from './NotificationBell';
-import { UserMenu } from './UserMenu';
-import { useCommandPalette } from './command-palette-context';
 
 export interface DockShellProps {
   children: ReactNode;
@@ -21,81 +13,21 @@ export interface DockShellProps {
 }
 
 /**
- * `dock` layout — mobile Dynamic Island.
+ * `dock` layout shell.
  *
- * ONE element always mounted at full viewport height. The visual morph between
- * pill (collapsed) and panel (expanded) is done EXCLUSIVELY with `clip-path` —
- * a GPU-composited property that never triggers layout. Height, width, padding,
- * border-radius are all constant; clip-path reveals or hides the surface.
+ * The floating {@link CommandDock} is now the SINGLE command surface at EVERY
+ * breakpoint — a full-width pill on mobile, a centered pill on desktop. Its panel
+ * unfolds INSIDE the pill to its own content height (grid-rows `0fr → 1fr`), so
+ * there is no separate full-height mobile island any more: no clip-path border
+ * seams, and no empty space below short content. Focus trap, scroll lock, Escape
+ * and the backdrop all live in `CommandDock`.
  *
- * This guarantees:
- * - 60 fps animation (compositor-only, zero main-thread layout work)
- * - Stable flex constraints (CommandCenter scroll always works)
- * - No mount/unmount (no React reconciliation during animation)
+ * Optional edge nav docks flank the viewport (each feature-flag gated).
  */
 export function DockShell({ children, now }: DockShellProps) {
-  const { open, setOpen } = useCommandPalette();
-  const notificationsEnabled = useFeatureFlag('notificationCenter');
   const edgeBottom = useFeatureFlag('edgeDockBottom');
   const edgeLeft = useFeatureFlag('edgeDockLeft');
   const edgeRight = useFeatureFlag('edgeDockRight');
-
-  const matches = useMatches();
-  let contextEntity: string | undefined;
-  for (const match of matches) {
-    if (hasRouteMeta(match.handle)) contextEntity = match.handle.routeMeta.aiEntity;
-  }
-
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  // backdrop-filter kills the clip-path GPU animation — disable it during
-  // the 480ms morph, enable after via data-settled.
-  const [settled, setSettled] = useState(!open);
-  useEffect(() => {
-    if (open) {
-      const raf = requestAnimationFrame(() => setSettled(false));
-      const id = setTimeout(() => setSettled(true), 520);
-      return () => { cancelAnimationFrame(raf); clearTimeout(id); };
-    }
-    const raf = requestAnimationFrame(() => setSettled(false));
-    return () => cancelAnimationFrame(raf);
-  }, [open]);
-
-  // Deferred focus — two rAFs so the clip-path animation paints first.
-  useEffect(() => {
-    if (!open) return;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => closeRef.current?.focus());
-    });
-    return () => cancelAnimationFrame(id);
-  }, [open]);
-
-  // Deferred scroll-lock — one rAF so overflow:hidden reflow doesn't
-  // collide with the clip-path transition's first frame.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    const id = requestAnimationFrame(() => {
-      document.body.style.overflow = 'hidden';
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  // Escape to close.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, setOpen]);
 
   return (
     <div className="flex min-h-svh flex-col overflow-x-hidden">

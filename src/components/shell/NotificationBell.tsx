@@ -26,7 +26,7 @@ const KIND_ICON: Record<NotificationItem['kind'], LucideIcon> = {
  * Notification center: bell + count badge. Desktop: Popover dropdown.
  * Mobile (below sm): bottom Sheet for proper touch UX.
  */
-export function NotificationBell() {
+export function NotificationBell({ className }: { className?: string }) {
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useNotifications();
   const isDesktop = useMediaQuery('(min-width: 640px)');
@@ -142,8 +142,27 @@ export function NotificationBell() {
   // Desktop: Popover
   return (
     <Popover>
-      <PopoverTrigger asChild>{bellButton}</PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('relative', className)}
+          aria-label={label}
+          data-action="open-notifications"
+          data-entity="notification"
+        >
+          <Bell className="size-4" aria-hidden />
+          {unread > 0 && (
+            <span
+              className="bg-destructive text-destructive-foreground absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[0.625rem] font-semibold leading-4 tabular-nums"
+              aria-hidden
+            >
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" collisionPadding={8} className="w-80 max-w-[calc(100vw-1rem)] p-0">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <p className="text-sm font-medium">Bildirimler</p>
           {unread > 0 && (
