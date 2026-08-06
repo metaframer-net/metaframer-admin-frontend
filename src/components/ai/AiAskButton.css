@@ -6,8 +6,11 @@
  * live on `.ask-btn`; dark overrides on `.dark .ask-btn` only where a semantic
  * token does not already flip correctly (the light "sheen" highlight).
  */
-.ask-btn {
-  /* Derived, component-scoped tokens (semantic-token references only). */
+/* Shared token source + round clipping box for BOTH surfaces: the interactive
+   `.ask-btn` launcher and the presentational `.ask-orb` (dock logo). Every color
+   is a semantic-token reference (no hardcoded colors). */
+.ask-btn,
+.ask-orb {
   --ask-highlight: color-mix(in oklab, var(--primary-foreground) 72%, transparent);
   --ask-ring: color-mix(in oklab, var(--primary) 60%, transparent);
   --ask-icon: var(--primary);
@@ -23,13 +26,26 @@
   --ask-glow: color-mix(in oklab, var(--primary) 28%, transparent);
   --ask-dot-from: color-mix(in oklab, var(--primary) 60%, transparent);
   --ask-dot-to: color-mix(in oklab, var(--accent) 45%, transparent);
+  /* Center color of the soft glow that tracks the cursor across the dot field. */
+  --ask-dot-glow: color-mix(in oklab, var(--primary) 50%, transparent);
 
   position: relative;
-  width: var(--ask-size, 84px);
-  height: var(--ask-size, 84px);
   border-radius: 9999px;
   overflow: hidden;
   isolation: isolate;
+}
+
+.dark .ask-btn,
+.dark .ask-orb {
+  --ask-highlight: color-mix(in oklab, var(--foreground) 28%, transparent);
+  --ask-surface: color-mix(in oklab, var(--card) 92%, transparent);
+}
+
+/* Interactive launcher: sized via `--ask-size`, with the glass chrome, elevation
+   and press/hover motion. */
+.ask-btn {
+  width: var(--ask-size, 84px);
+  height: var(--ask-size, 84px);
   cursor: pointer;
   border: 0;
   background: transparent;
@@ -46,9 +62,16 @@
   backdrop-filter: blur(16px) saturate(150%);
 }
 
-.dark .ask-btn {
-  --ask-highlight: color-mix(in oklab, var(--foreground) 28%, transparent);
-  --ask-surface: color-mix(in oklab, var(--card) 92%, transparent);
+/* Icon-only logo variant: the host supplies the box size (e.g. `size-7`), the
+   sparkle sits centered at 50% of that box. No chrome/elevation — it lives inside
+   the glass dock pill, which owns the surrounding surface. */
+.ask-orb {
+  display: inline-flex;
+}
+
+.ask-orb .ask-btn__icon svg {
+  width: 50%;
+  height: 50%;
 }
 
 .ask-btn:hover {
@@ -153,14 +176,18 @@
 
 .ask-btn__icon {
   color: var(--ask-icon);
-  filter: drop-shadow(0 0 10px var(--ask-icon-glow));
+  filter: drop-shadow(0 0 12px var(--ask-icon-glow));
   transition: transform 500ms ease;
   display: grid;
   place-items: center;
 }
 
-.ask-btn:hover .ask-btn__icon {
+.ask-btn:hover .ask-btn__icon:not(.is-spinning) {
   transform: rotate(12deg) scale(1.1);
+}
+
+.ask-btn__icon.is-spinning {
+  animation: ask-spin 1.4s linear infinite;
 }
 
 .ask-btn__icon svg {
@@ -177,6 +204,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  text-shadow: 0 4px 20px var(--ask-glow);
 }
 
 @keyframes ask-shine {
@@ -185,6 +213,12 @@
   }
   100% {
     left: 120%;
+  }
+}
+
+@keyframes ask-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -197,8 +231,11 @@
   .ask-btn:hover {
     transform: none;
   }
-  .ask-btn:hover .ask-btn__icon {
+  .ask-btn:hover .ask-btn__icon:not(.is-spinning) {
     transform: none;
+  }
+  .ask-btn__icon.is-spinning {
+    animation: none;
   }
   .ask-btn:hover .ask-btn__shine {
     opacity: 0;

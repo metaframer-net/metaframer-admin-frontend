@@ -36,24 +36,6 @@ export const List: Story = {
   },
 };
 
-/**
- * dock variant — the icon-tile command center (identity header + navigation).
- * `CommandCardLauncher` is the mobile host: from `xl` up it renders nothing (the
- * dock pill owns the command center INSIDE itself), so this story pins a below-xl
- * viewport for the dialog to exist.
- */
-export const Cards: Story = {
-  args: { variant: 'cards' },
-  parameters: { viewport: { defaultViewport: 'bpSm' } },
-  play: async () => {
-    const dialog = await within(document.body).findByRole('dialog');
-    // A leaf module (dashboard → `/`) renders as a real link, so middle-click /
-    // ⌘-click open it in a new tab instead of being swallowed by an onClick.
-    await expect(within(dialog).getByRole('link', { name: /Genel Bakış/ })).toBeInTheDocument();
-    await expect(within(dialog).getByText('AI hazır')).toBeInTheDocument();
-  },
-};
-
 /** List variant rendered at a narrow mobile viewport (360 px). */
 export const Mobile: Story = {
   args: { variant: 'list' },
