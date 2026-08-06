@@ -174,10 +174,10 @@ export function CrmPipelinePage() {
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : (
-              <div className="flex items-center gap-6" role="img" aria-label="Aktif leadlerin öncelik dağılımı">
-                <ResponsiveContainer width="50%" height={240}>
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6" role="img" aria-label="Aktif leadlerin öncelik dağılımı">
+                <ResponsiveContainer width="100%" height={200} className="sm:!w-1/2 sm:!h-[240px]">
                   <PieChart>
-                    <Pie data={priorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={50}>
+                    <Pie data={priorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40}>
                       {priorityData.map((entry, i) => (
                         <Cell key={entry.name} fill={PRIORITY_CHART_COLORS[i] ?? 'var(--color-chart-1)'} />
                       ))}
@@ -219,7 +219,7 @@ export function CrmPipelinePage() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={stageRevenueData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="stage" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                <XAxis dataKey="stage" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={50} className="fill-muted-foreground" />
                 <YAxis tickFormatter={(v: number) => formatTry(v)} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                 <Tooltip
                   contentStyle={{ borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}

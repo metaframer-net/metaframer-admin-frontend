@@ -67,7 +67,7 @@ export function FilterBar({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {/* Free-text search */}
-        <div className="relative min-w-48 flex-1">
+        <div className="relative min-w-0 flex-1 sm:min-w-48">
           <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <Input
             value={state.q}
@@ -246,7 +246,7 @@ export function FilterBar({
           {chips.map((chip) => (
             <Chip key={chip.key} label={chip.label} onClear={chip.onClear} />
           ))}
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => state.clearAll()} data-action="clear-all-filters" data-entity="table">
+          <Button variant="ghost" size="sm" className="px-2 text-xs" onClick={() => state.clearAll()} data-action="clear-all-filters" data-entity="table">
             Tümünü temizle
           </Button>
         </div>

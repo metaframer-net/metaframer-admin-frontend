@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMatches } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
@@ -47,6 +47,18 @@ export function DockShell({ children, now }: DockShellProps) {
 
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  // backdrop-filter kills the clip-path GPU animation — disable it during
+  // the 480ms morph, enable after via data-settled.
+  const [settled, setSettled] = useState(!open);
+  useEffect(() => {
+    if (open) {
+      setSettled(false);
+      const id = setTimeout(() => setSettled(true), 520);
+      return () => clearTimeout(id);
+    }
+    setSettled(false);
+  }, [open]);
+
   // Deferred focus — two rAFs so the clip-path animation paints first.
   useEffect(() => {
     if (!open) return;
@@ -88,7 +100,7 @@ export function DockShell({ children, now }: DockShellProps) {
       {/* ── Backdrop ── */}
       <div
         className={cn(
-          'fixed inset-0 z-30 bg-foreground/40 backdrop-blur-[1px] transition-opacity duration-300 xl:hidden',
+          'fixed inset-0 z-[35] bg-foreground/40 backdrop-blur-[1px] transition-opacity duration-300 xl:hidden',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={() => setOpen(false)}
@@ -100,7 +112,8 @@ export function DockShell({ children, now }: DockShellProps) {
           Collapsed: clips to a 3.5rem pill at the top with round corners.
           Expanded:  clips to the full rectangle with 1.5rem radius. */}
       <div
-        className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border backdrop-blur-md xl:hidden"
+        className="dock-island bg-glass text-glass-foreground border-glass-border fixed inset-x-4 top-3 z-40 flex h-[calc(100dvh-1.5rem)] flex-col border xl:hidden"
+        data-settled={settled ? 'true' : undefined}
         style={{
           // Collapsed radius is 1.75rem (= half the 3.5rem pill height → fully round
           // ends, identical to the old 9999px which the browser capped anyway). The

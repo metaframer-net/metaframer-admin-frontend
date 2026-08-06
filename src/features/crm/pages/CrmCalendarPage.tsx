@@ -175,13 +175,13 @@ export function CrmCalendarPage() {
                 {MONTHS_TR[month]} {year}
               </CardTitle>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={prevMonth} aria-label="Önceki ay">
+                <Button variant="ghost" size="icon" onClick={prevMonth} aria-label="Önceki ay">
                   <ChevronLeft className="size-4" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={goToday}>
                   Bugün
                 </Button>
-                <Button variant="ghost" size="sm" onClick={nextMonth} aria-label="Sonraki ay">
+                <Button variant="ghost" size="icon" onClick={nextMonth} aria-label="Sonraki ay">
                   <ChevronRight className="size-4" />
                 </Button>
               </div>

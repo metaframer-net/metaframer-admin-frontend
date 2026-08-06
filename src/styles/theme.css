@@ -755,6 +755,12 @@
   .dock-island {
     transition: clip-path 480ms cubic-bezier(0.32, 0.72, 0, 1);
     will-change: clip-path;
+    /* No blur during clip-path morph — backdrop-filter forces the browser
+       to re-composite the blur on every frame of the clip change. */
+  }
+  .dock-island[data-settled='true'] {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   /* While the island is clipped to pill shape, suppress the pc-stack
      height transition so it never fights the clip-path GPU animation. */
