@@ -68,7 +68,7 @@ export function ActivityFormDialog({ onSubmit }: ActivityFormDialogProps) {
                   onBlur={field.onBlur}
                   aria-invalid={field['aria-invalid']}
                   aria-describedby={field['aria-describedby']}
-                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none sm:text-sm"
                   data-entity="activity"
                   data-action="edit-field"
                 >

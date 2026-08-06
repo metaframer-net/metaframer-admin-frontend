@@ -49,7 +49,7 @@ export function DataKanban<TData, TStatus extends string>({
         <section
           key={col.key}
           role="listitem"
-          className="bg-card/40 flex max-h-[32rem] w-72 shrink-0 flex-col rounded-xl border border-border"
+          className="bg-card/40 flex max-h-[32rem] w-60 shrink-0 flex-col rounded-xl border border-border sm:w-72"
         >
           <header className="flex items-center gap-2 border-b border-border px-3 py-2.5 text-sm font-semibold">
             {col.dot && <span className={`size-2 rounded-full ${col.dot}`} aria-hidden="true" />}

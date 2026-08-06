@@ -20,7 +20,7 @@ interface DockItem {
 }
 
 /* macOS-style magnification tuning (our own values, reference proportions). */
-const BASE = 38; // visual tile size (px)
+const BASE = 42; // visual tile size (px)
 const GAP = 6;
 const MIN = 1;
 const MAX = 1.5;
@@ -520,15 +520,13 @@ const SHELL: Record<DockEdge, EdgeShell> = {
   bottom: {
     wrapper: 'bottom-1 left-1/2 -translate-x-1/2',
     // 44px hit box; the visible tab is a clear ~20px rounded bar at the edge.
-    hintBox: 'min-h-11 w-24 items-end justify-center',
-    hintBar: 'h-5 w-24 rounded-t-2xl',
+    hintBox: 'min-h-11 w-28 items-end justify-center',
+    hintBar: 'h-6 w-28 rounded-t-2xl',
     // Stage anchored AT the edge (not above the 44px hit box) so the open dock sits
     // right by the tab with no gap; it just slides up + fades in.
     stagePos: 'bottom-0 left-1/2',
-    stageOpen: '-translate-x-1/2 translate-y-0 scale-100 opacity-100',
-    // Travels its full height plus a margin, so the dock genuinely flies up from
-    // off-screen and the spring has distance to settle over.
-    stageClosed: '-translate-x-1/2 translate-y-[calc(100%+2.5rem)] scale-90 opacity-0',
+    stageOpen: '-translate-x-1/2 scale-100 opacity-100',
+    stageClosed: '-translate-x-1/2 scale-x-100 scale-y-0 opacity-0',
     origin: 'origin-bottom',
     pulseDelay: 'calc(var(--stagger-step) * 6)',
     padding: 'px-2 py-1.5',
@@ -536,11 +534,11 @@ const SHELL: Record<DockEdge, EdgeShell> = {
   },
   left: {
     wrapper: 'left-1 top-1/2 -translate-y-1/2',
-    hintBox: 'min-w-11 h-24 items-center justify-start',
-    hintBar: 'h-24 w-5 rounded-r-2xl',
+    hintBox: 'min-w-11 h-28 items-center justify-start',
+    hintBar: 'h-28 w-6 rounded-r-2xl',
     stagePos: 'left-0 top-1/2',
-    stageOpen: '-translate-y-1/2 translate-x-0 scale-100 opacity-100',
-    stageClosed: '-translate-y-1/2 -translate-x-[calc(100%+2.5rem)] scale-90 opacity-0',
+    stageOpen: '-translate-y-1/2 scale-100 opacity-100',
+    stageClosed: '-translate-y-1/2 scale-x-0 scale-y-100 opacity-0',
     origin: 'origin-left',
     pulseDelay: 'calc(var(--stagger-step) * 12)',
     padding: 'px-1.5 py-2',
@@ -548,11 +546,11 @@ const SHELL: Record<DockEdge, EdgeShell> = {
   },
   right: {
     wrapper: 'right-1 top-1/2 -translate-y-1/2',
-    hintBox: 'min-w-11 h-24 items-center justify-end',
-    hintBar: 'h-24 w-5 rounded-l-2xl',
+    hintBox: 'min-w-11 h-28 items-center justify-end',
+    hintBar: 'h-28 w-6 rounded-l-2xl',
     stagePos: 'right-0 top-1/2',
-    stageOpen: '-translate-y-1/2 translate-x-0 scale-100 opacity-100',
-    stageClosed: '-translate-y-1/2 translate-x-[calc(100%+2.5rem)] scale-90 opacity-0',
+    stageOpen: '-translate-y-1/2 scale-100 opacity-100',
+    stageClosed: '-translate-y-1/2 scale-x-0 scale-y-100 opacity-0',
     origin: 'origin-right',
     pulseDelay: 'calc(var(--stagger-step) * 24)',
     padding: 'px-1.5 py-2',
@@ -690,7 +688,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
           // Transform rides the overshoot; opacity is deliberately quicker and on a
           // plain curve so the dock is legible for the whole arrival instead of
           // fading in only as it lands.
-          'absolute transition-[transform,opacity] [transition-duration:var(--duration-reveal),var(--duration-base)] [transition-timing-function:var(--ease-spring),var(--ease-standard)] motion-reduce:transition-none',
+          'absolute transition-[scale,opacity] [transition-duration:var(--duration-reveal),var(--duration-base)] [transition-timing-function:var(--ease-emphasized),var(--ease-standard)] motion-reduce:transition-none',
           cfg.stagePos,
           cfg.origin,
           open ? cfg.stageOpen : cn('pointer-events-none', cfg.stageClosed),

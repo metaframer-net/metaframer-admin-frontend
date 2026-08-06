@@ -60,7 +60,7 @@ export function ListingPhotoStudio({ initialCount = 3 }: ListingPhotoStudioProps
                 type="button"
                 onClick={() => remove(id)}
                 aria-label={`${i + 1}. fotoğrafı kaldır`}
-                className="bg-background/80 text-foreground hover:bg-background absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border border-border"
+                className="bg-background/80 text-foreground hover:bg-background absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border border-border after:absolute after:-inset-3.5 after:content-['']"
                 data-action="remove-photo"
                 data-entity="listing"
               >
