@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
+import { Scrim } from '@/components/ui/scrim';
 import { hasRouteMeta } from '@/app/route-meta';
 import { CommandDock } from './CommandDock';
 import { CommandCenter } from './CommandCenter';
@@ -99,14 +100,7 @@ export function DockShell({ children, now }: DockShellProps) {
   return (
     <div className="flex min-h-svh flex-col overflow-x-hidden">
       {/* ── Backdrop ── */}
-      <div
-        className={cn(
-          'fixed inset-0 z-[35] bg-foreground/40 backdrop-blur-[1px] transition-opacity duration-300 xl:hidden',
-          open ? 'opacity-100' : 'pointer-events-none opacity-0',
-        )}
-        onClick={() => setOpen(false)}
-        aria-hidden
-      />
+      <Scrim open={open} onClick={() => setOpen(false)} className="xl:hidden" />
 
       {/* ── Mobile Dynamic Island ──
           Always full height. clip-path is the ONLY animated property.

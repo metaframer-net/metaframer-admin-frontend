@@ -12,6 +12,7 @@ import { MoreHorizontal, X } from 'lucide-react';
 
 import { type NavItem } from '@/config/nav-schema';
 import { cn } from '@/lib/utils';
+import { Scrim } from '@/components/ui/scrim';
 import { Separator } from '@/components/ui/separator';
 import { hasRouteMeta } from '@/app/route-meta';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
@@ -497,17 +498,9 @@ export function CommandDock({ now, className }: CommandDockProps) {
 
   return (
     <>
-      {/* Backdrop — dims and de-focuses the page the panel floats over. Mounted
-          with the panel so it can fade back out. */}
+      {/* Backdrop — dims and de-focuses the page the panel floats over. */}
       {rendered && (
-        <div
-          className={cn(
-            'bg-scrim fixed inset-0 z-30 hidden backdrop-blur-sm transition-opacity duration-[var(--duration-slow)] xl:block',
-            panelOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
-          )}
-          onClick={() => setOpen(false)}
-          aria-hidden
-        />
+        <Scrim open={panelOpen} onClick={() => setOpen(false)} zIndex={30} className="hidden xl:block" />
       )}
 
       <div
