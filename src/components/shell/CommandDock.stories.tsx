@@ -159,7 +159,7 @@ export const InlineNav: Story = {
     // Clicking a dot opens the command center inside the pill (it does not navigate).
     await userEvent.click(overview);
     await expect(
-      body.getByRole('dialog', { name: 'Nereye gitmek istersin?' }),
+      body.getByRole('dialog', { name: 'Komut merkezi' }),
     ).toBeInTheDocument();
   },
 };
@@ -177,7 +177,7 @@ export const PanelOpen: Story = {
     const pill = body.getByRole('button', { name: LAUNCHER });
     await userEvent.click(pill);
 
-    const dialog = await body.findByRole('dialog', { name: 'Nereye gitmek istersin?' });
+    const dialog = await body.findByRole('dialog', { name: 'Komut merkezi' });
     // The pill row is NOT replaced — the panel lives in the same surface.
     await expect(pill).toBeVisible();
     await expect(pill).toHaveAttribute('aria-expanded', 'true');
@@ -241,14 +241,18 @@ export const StatusLine: Story = {
 };
 
 /**
- * Mobile (below xl): the floating dock is `hidden xl:flex`, so it drops out of the
- * layout entirely — the DockShell renders its own compact command pill + bottom nav
- * there instead. Asserts the launcher is absent (display:none → off the a11y tree).
+ * Mobile (below xl): the dock is now the SINGLE command surface — a full-width
+ * pill (there is no separate mobile island any more). The status reads "Şu an:
+ * {page}"; the clock/⌘K and the nav strip are desktop-only so the pill never
+ * crams. The launcher is present and carries the full accessible name.
  */
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'bpSm' } },
   play: async () => {
-    await expect(within(document.body).queryByRole('button', { name: LAUNCHER })).toBeNull();
+    const pill = within(document.body).getByRole('button', { name: LAUNCHER });
+    await expect(pill).toBeInTheDocument();
+    await expect(pill).toHaveTextContent('Şu an:');
+    await expect(pill).toHaveTextContent('Genel Bakış');
   },
 };
 

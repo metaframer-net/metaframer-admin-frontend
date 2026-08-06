@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,7 +14,6 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { hasRouteMeta } from '@/app/route-meta';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
-import { DOCK_DESKTOP_QUERY, useMediaQuery } from '@/lib/layout/use-media-query';
 import { CommandCenter } from './CommandCenter';
 import { DockLogo } from './DockLogo';
 import { NotificationBell } from './NotificationBell';
@@ -367,7 +365,6 @@ export interface CommandDockProps {
 export function CommandDock({ now, className }: CommandDockProps) {
   const { open, setOpen, source } = useCommandPalette();
   const notificationsEnabled = useFeatureFlag('notificationCenter');
-  const isDesktop = useMediaQuery(DOCK_DESKTOP_QUERY);
   const nav = usePermittedNav();
   const { pathname } = useLocation();
   const matches = useMatches();
@@ -375,14 +372,13 @@ export function CommandDock({ now, className }: CommandDockProps) {
   const overflow = nav.length - inlineItems.length;
   const time = formatTime(useDockClock(now));
 
-  const panelTitleId = useId();
   const pillRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // The panel only exists on the desktop pill; below xl the dialog launcher owns
-  // it, so the two never fight over focus, scroll lock or the Escape key.
-  const panelOpen = open && isDesktop;
+  // The dock is now the SINGLE host at every breakpoint (the old mobile island is
+  // gone), so the panel opens whenever the palette is open — desktop or mobile.
+  const panelOpen = open;
 
   // ⌘K and Escape drive this surface dozens of times a day, and an unfold on a
   // keyboard action reads as lag rather than polish — so those transitions play
@@ -477,23 +473,10 @@ export function CommandDock({ now, className }: CommandDockProps) {
     // Deepest matched route wins — it is the page the user is actually on.
     contextEntity = match.handle.routeMeta.aiEntity;
   }
+  // The pill shows ONLY the current page (leaf) — a full breadcrumb trail here
+  // overflows the chrome once it deepens. The accessible name below still carries
+  // the whole path for assistive tech; the on-page breadcrumbs carry it visually.
   const activeLabel = trail.at(-1) ?? activeItem?.label ?? 'Panel';
-
-  // Visible trail: from three steps up it elides to `first › … › last` so the chip
-  // stays one line. The accessible name (below) always carries the full path.
-  const visible = trail.length > 0 ? trail : [activeLabel];
-  const statusTrail =
-    visible.length > 2
-      ? [
-          { key: 'first', label: visible[0]!, muted: true },
-          { key: 'elided', label: '…', muted: true },
-          { key: 'last', label: visible[visible.length - 1]!, muted: false },
-        ]
-      : visible.map((label, index) => ({
-          key: `${label}-${index}`,
-          label,
-          muted: index < visible.length - 1,
-        }));
 
   return (
     <>
@@ -502,7 +485,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
       {rendered && (
         <div
           className={cn(
-            'bg-scrim fixed inset-0 z-30 hidden backdrop-blur-sm transition-opacity duration-[var(--duration-slow)] xl:block',
+            'bg-scrim fixed inset-0 z-30 backdrop-blur-sm transition-opacity duration-[var(--duration-slow)]',
             panelOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
           onClick={() => setOpen(false)}
@@ -512,7 +495,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
 
       <div
         className={cn(
-          'dock-pill bg-glass text-glass-foreground border-glass-border fixed left-1/2 top-3 z-40 hidden -translate-x-1/2 flex-col border shadow-lg backdrop-blur-md xl:flex',
+          'dock-pill bg-glass text-glass-foreground border-glass-border fixed left-1/2 top-3 z-40 flex -translate-x-1/2 flex-col border shadow-lg backdrop-blur-md',
           className,
         )}
         data-open={panelOpen ? 'true' : 'false'}
@@ -546,7 +529,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
               ref={pillRef}
               type="button"
               onClick={() => setOpen(!open)}
-              className="hover:bg-glass-foreground/10 focus-visible:ring-ring inline-flex min-h-11 min-w-0 max-w-[36rem] items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] focus-visible:ring-2 motion-reduce:active:scale-100"
+              className="hover:bg-glass-foreground/10 inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-full pl-1.5 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] motion-reduce:active:scale-100"
               aria-label={`arsam.net · Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
               aria-keyshortcuts="Meta+K Control+K"
               aria-haspopup="dialog"
@@ -555,64 +538,83 @@ export function CommandDock({ now, className }: CommandDockProps) {
               data-entity="command"
             >
               <DockLogo className="size-7 shrink-0" />
-              {/* Brand-led resting pill. The verbose status (where you are, the
+              {/* Brand text is desktop-only. On desktop the verbose status (page,
                   clock, ⌘K) is decluttered out of the collapsed state and springs
-                  back on hover or keyboard focus-within — the same reveal mechanism
-                  the nav strip uses. The button's accessible NAME (below) still
-                  carries the full "Şu an: … saat …" reading, so assistive tech and
-                  the status contract are unaffected by the visual gating. */}
-              <span className="shrink-0 font-semibold tracking-tight">arsam.net</span>
-              <span className="dock-reveal">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  {/* A steady green dot marks it live — no pulse. */}
-                  <span className="bg-success size-1.5 shrink-0 rounded-full" aria-hidden />
-                  <span className="text-muted-foreground shrink-0">Şu an:</span>
-                  <span className="flex min-w-0 items-center gap-1">
-                    {statusTrail.map((step, index) => (
-                      <span key={step.key} className="flex min-w-0 items-center gap-1">
-                        {index > 0 && <span className="text-muted-foreground shrink-0">›</span>}
-                        <span className={cn('truncate', step.muted ? 'text-muted-foreground' : 'font-semibold')}>
-                          {step.label}
-                        </span>
-                      </span>
-                    ))}
+                  back on hover/focus; on mobile (coarse pointer) the reveal is
+                  always open, so "Şu an: {page}" is the resting label. The clock and
+                  ⌘K stay desktop-only so the mobile pill never crams. The accessible
+                  NAME (below) carries the full "Şu an: … saat …" reading regardless. */}
+              <span className="hidden shrink-0 font-semibold tracking-tight xl:inline">
+                arsam.net
+              </span>
+              {/* Desktop: brand-led resting pill; the verbose status (page · clock ·
+                  ⌘K) springs out of the `.dock-reveal` on hover/focus. Wrapped in a
+                  plain `hidden xl:block` span so it never fights the mobile status. */}
+              <span className="hidden xl:block">
+                <span className="dock-reveal">
+                  {/* `whitespace-nowrap`: while the reveal grid animates 0fr→1fr the
+                      content is clipped; without nowrap a long page name ("Pipeline
+                      Raporları") wraps and overlaps itself mid-animation. */}
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="bg-success size-1.5 shrink-0 rounded-full" aria-hidden />
+                    <span className="text-muted-foreground shrink-0">Şu an:</span>
+                    <span className="font-semibold">{activeLabel}</span>
+                    <span className="bg-glass-border/70 h-3.5 w-px shrink-0" aria-hidden />
+                    <span className="text-muted-foreground shrink-0 font-mono text-[0.6875rem] tabular-nums tracking-wide">
+                      {time}
+                    </span>
+                    <kbd className="bg-background/40 text-muted-foreground border-glass-border pointer-events-none ml-0.5 shrink-0 select-none rounded border px-1.5 font-mono text-[0.625rem]">
+                      ⌘K
+                    </kbd>
                   </span>
-                  <span className="bg-glass-border/70 h-3.5 w-px shrink-0" aria-hidden />
-                  <span className="text-muted-foreground shrink-0 font-mono text-[0.6875rem] tabular-nums tracking-wide">
-                    {time}
-                  </span>
-                  <kbd className="bg-background/40 text-muted-foreground border-glass-border pointer-events-none ml-0.5 shrink-0 select-none rounded border px-1.5 font-mono text-[0.625rem]">
-                    ⌘K
-                  </kbd>
                 </span>
+              </span>
+              {/* Mobile: a tight, left-aligned status (natural width, no `flex-1`
+                  gap). "Şu an:" is dropped below 360px so the whole module name fits
+                  at 320; the title truncates only when it genuinely can't fit. */}
+              <span className="flex min-w-0 items-center gap-1.5 xl:hidden">
+                <span className="bg-success size-1.5 shrink-0 rounded-full" aria-hidden />
+                <span className="text-muted-foreground hidden shrink-0 text-xs min-[360px]:inline">
+                  Şu an:
+                </span>
+                <span className="min-w-0 truncate text-sm font-semibold">{activeLabel}</span>
               </span>
             </button>
 
-            {/* Inline module dots — the track collapses to 0fr and springs back to
-                the strip's natural width on hover/focus. It is suppressed while the
-                panel is open, where the card grid supersedes it. A single sliding
-                highlight glides between the dots (see DockNavStrip). */}
-            <DockNavStrip
-              items={inlineItems}
-              overflowCount={overflow}
-              pathname={pathname}
-              onOpen={() => setOpen(true)}
-            />
+            {/* Inline module dots — desktop only (the mobile pill stays a clean
+                logo + status). `hidden xl:contents` keeps the strip out of the flow
+                below xl without disturbing its layout at xl. The track collapses to
+                0fr and springs back on hover/focus; it is suppressed while the panel
+                is open, where the card grid supersedes it. */}
+            <div className="hidden xl:contents">
+              <DockNavStrip
+                items={inlineItems}
+                overflowCount={overflow}
+                pathname={pathname}
+                onOpen={() => setOpen(true)}
+              />
+            </div>
           </div>
 
           {/* Thin divider, then the controls. Notifications stay in the resting
               pill; the user menu joins the hover/focus reveal so the collapsed
               state is brand + bell only. On coarse pointers the pill starts
               engaged (theme.css), so the menu is never hover-trapped on touch. */}
-          <Separator orientation="vertical" className="bg-glass-border/60 h-6" />
+          {/* Divider is desktop-only — on the narrow mobile pill it just steals room
+              the status title needs. */}
+          <Separator orientation="vertical" className="bg-glass-border/60 h-6 max-xl:hidden" />
           {/* Bell + profile are the two exceptions to the click-anywhere toggle:
               they own their clicks (notifications popover / user menu) and must not
               open or close the command panel. */}
+          {/* Bell + profile use a GLASS hover (not the teal `accent` ghost default,
+              which reads as a jarring filled box on the glass chrome). */}
           <div className="flex shrink-0 items-center gap-1" data-dock-exclude>
-            {notificationsEnabled && <NotificationBell />}
+            {notificationsEnabled && (
+              <NotificationBell className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent" />
+            )}
             <span className="dock-reveal">
               <span>
-                <UserMenu />
+                <UserMenu className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent" />
               </span>
             </span>
           </div>
@@ -628,7 +630,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby={panelTitleId}
+                aria-label="Komut merkezi"
                 inert={!panelOpen}
                 tabIndex={-1}
                 onMouseDown={(e) => {
@@ -638,15 +640,13 @@ export function CommandDock({ now, className }: CommandDockProps) {
                 }}
                 className="border-glass-border/60 flex max-h-[calc(100dvh-7rem)] min-h-0 flex-col border-t outline-none"
               >
-                <div className="flex flex-none items-center justify-between gap-3 px-5 pb-3 pt-4">
-                  <h2 id={panelTitleId} className="text-lg font-semibold tracking-tight">
-                    Nereye gitmek istersin?
-                  </h2>
+                {/* No title (removed per spec) — just the close control, right-aligned. */}
+                <div className="flex flex-none items-center justify-end px-3 pb-1 pt-2">
                   <button
                     ref={closeRef}
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="dock-close hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-ring text-muted-foreground inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2"
+                    className="dock-close hover:bg-glass-foreground/10 hover:text-glass-foreground text-muted-foreground inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none"
                     aria-label="Kapat"
                     data-action="close-command-palette"
                     data-entity="command"

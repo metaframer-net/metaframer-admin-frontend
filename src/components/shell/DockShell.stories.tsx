@@ -75,7 +75,7 @@ export const Desktop: Story = {
 export const Tablet: Story = {
   parameters: { viewport: { defaultViewport: 'bpLg' } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('button', { name: 'Menü ve komut aramayı aç' })).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: /menü ve komut aramayı aç/i })).toBeInTheDocument();
     await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
   },
 };
@@ -85,7 +85,7 @@ export const Phone: Story = {
   parameters: { viewport: { defaultViewport: 'bpSm' } },
   play: async ({ canvas }) => {
     // The floating pill's launcher is reachable; the bottom nav is intentionally absent.
-    await expect(canvas.getByRole('button', { name: 'Menü ve komut aramayı aç' })).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: /menü ve komut aramayı aç/i })).toBeInTheDocument();
     await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
     // Edge nav docks carry navigation on mobile too.
     await expect(document.body.querySelectorAll('[data-slot="edge-dock"]').length).toBeGreaterThan(0);

@@ -191,16 +191,18 @@ export const MagnifiesAndGrows: Story = {
   },
 };
 
-/** Visible on mobile too — the collapsed hint tab renders and opens at a phone width. */
-export const MobileVisible: Story = {
+/**
+ * Desktop only — below xl the edge dock is hidden (`max-xl:hidden`). The full-width
+ * command pill carries navigation on mobile, so the edge handles would otherwise
+ * peek as stray rectangles beside it. The element still renders (in the DOM) but
+ * is `display: none` at a phone width.
+ */
+export const MobileHidden: Story = {
   args: { edge: 'bottom' },
   parameters: { viewport: { defaultViewport: 'bpXs' } },
   play: async () => {
     const dock = document.body.querySelector('[data-slot="edge-dock"]');
     if (!(dock instanceof HTMLElement)) throw new Error('edge dock did not render');
-    await expect(getComputedStyle(dock).display).not.toBe('none');
-    const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
-    await userEvent.click(hint);
-    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    await expect(getComputedStyle(dock).display).toBe('none');
   },
 };
