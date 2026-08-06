@@ -104,8 +104,9 @@ function LiquidEdgeStage({ edge, onNavigate }: { edge: DockEdge; onNavigate: () 
       navigate(navItem.to);
     } else {
       setPaletteOpen(true);
+      onNavigate(); // palette opens immediately, close dock
     }
-    onNavigate();
+    // For nav items: don't close yet — onSettled will close after spring rests
   };
 
   const isVertical = edge === 'left' || edge === 'right';
@@ -123,6 +124,7 @@ function LiquidEdgeStage({ edge, onNavigate }: { edge: DockEdge; onNavigate: () 
         tabs={tabs}
         activeIndex={activeIdx >= 0 ? activeIdx : 0}
         onSelect={handleSelect}
+        onSettled={onNavigate}
         orientation={isVertical ? 'vertical' : 'horizontal'}
         side={edge === 'left' ? 'left' : edge === 'right' ? 'right' : undefined}
       />

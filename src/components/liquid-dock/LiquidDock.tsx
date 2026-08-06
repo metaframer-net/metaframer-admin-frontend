@@ -22,6 +22,8 @@ export interface LiquidDockProps {
   tabs?: DockTab[] | undefined;
   activeIndex?: number | undefined;
   onSelect?: ((idx: number) => void) | undefined;
+  /** Called when the spring settles after a tab change (not on active-tab pulse). */
+  onSettled?: (() => void) | undefined;
   /** Default: 'horizontal'. Vertical docks show icon-only with side tooltips. */
   orientation?: DockOrientation | undefined;
   /** For vertical: which side the dock sits on (tooltip direction). */
@@ -90,6 +92,7 @@ export function LiquidDock({
   tabs = DEFAULT_TABS,
   activeIndex = 0,
   onSelect,
+  onSettled,
   orientation = 'horizontal',
   side,
 }: LiquidDockProps) {
@@ -109,7 +112,8 @@ export function LiquidDock({
   }>({ start: { x: 0, v: 0, target: 0 }, end: { x: 0, v: 0, target: 0 }, currentActive: activeIndex, initialized: false });
 
   const onSelectStable = useRef(onSelect);
-  useLayoutEffect(() => { onSelectStable.current = onSelect; });
+  const onSettledStable = useRef(onSettled);
+  useLayoutEffect(() => { onSelectStable.current = onSelect; onSettledStable.current = onSettled; });
 
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -136,6 +140,8 @@ export function LiquidDock({
     let running = false;
     let raf = 0;
     let lastTime = 0;
+    let traveling = false; // true after a tab change, until spring settles
+    let safetyTimer = 0;   // fallback if onRest never fires
     const DRAG_THRESHOLD = 8;
 
     // Must be declared before the activeIndex check below calls it
@@ -340,7 +346,17 @@ export function LiquidDock({
         && Math.abs(state.end.x - state.end.target) < 0.2
         && Math.abs(state.start.v) < 0.3 && Math.abs(state.end.v) < 0.3;
 
-      if (settled) { state.start.x = state.start.target; state.end.x = state.end.target; state.start.v = 0; state.end.v = 0; }
+      if (settled) {
+        state.start.x = state.start.target; state.end.x = state.end.target;
+        state.start.v = 0; state.end.v = 0;
+        // Fire onSettled when spring rests after a tab change
+        if (traveling) {
+          traveling = false;
+          clearTimeout(safetyTimer);
+          // Brief pause so the lens sits for a beat before panel closes
+          setTimeout(() => { onSettledStable.current?.(); }, 120);
+        }
+      }
 
       paintLens(); paintDot(); paintIcons();
 
@@ -393,7 +409,20 @@ export function LiquidDock({
       pointerDown = false;
       const pos = localMain(e);
       const idx = nearestSlot(pos);
-      if (pressedOnActive) { lens.style.transition = 'transform 120ms ease-out'; lens.style.transform = ''; pressedOnActive = false; return; }
+      if (pressedOnActive) {
+        // Pulse on active tab, then settle
+        lens.style.transition = 'transform 120ms ease-out'; lens.style.transform = '';
+        pressedOnActive = false;
+        setTimeout(() => { onSettledStable.current?.(); }, 140);
+        return;
+      }
+      // Tab change: start traveling, navigate immediately
+      traveling = true;
+      clearTimeout(safetyTimer);
+      safetyTimer = window.setTimeout(() => {
+        // Safety: if spring never settles, fire onSettled anyway
+        if (traveling) { traveling = false; onSettledStable.current?.(); }
+      }, 600);
       setTarget(idx); state.currentActive = idx; hoveredIdx = idx; tryHaptic();
       onSelectStable.current?.(idx); ensureLoop();
       lens.style.transition = 'none'; lens.style.transform = '';
@@ -434,6 +463,7 @@ export function LiquidDock({
     return () => {
       cancelAnimationFrame(raf);
       cancelAnimationFrame(initRaf);
+      clearTimeout(safetyTimer);
       ro.disconnect();
       vv?.removeEventListener('resize', onVVResize);
       bar.removeEventListener('pointerdown', onPointerDown);
