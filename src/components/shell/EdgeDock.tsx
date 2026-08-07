@@ -210,10 +210,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
     />
     <div
       ref={wrapperRef}
-      // Desktop only: below xl the full-width command pill spans the viewport, so
-      // the edge-dock handles would peek as stray rectangles beside it. The command
-      // pill already carries all navigation on mobile.
-      className={cn('fixed z-30 max-xl:hidden', cfg.wrapper)}
+      className={cn('fixed z-30', cfg.wrapper)}
       onBlur={(e) => closeIfOutside(e.relatedTarget)}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {

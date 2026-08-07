@@ -9,7 +9,6 @@ import { PageSkeleton } from '@/app/pages/PageSkeleton';
 import { CommandPaletteProvider } from './command-palette-context';
 import { CommandLauncher } from './CommandLauncher';
 import { DockShell } from './DockShell';
-import { MobileBottomNav } from './MobileNav';
 import { RouteGuard } from './RouteGuard';
 import { SidebarShell } from './SidebarShell';
 import { TopnavShell } from './TopnavShell';
@@ -50,9 +49,8 @@ export function AppShell({ children }: AppShellProps) {
         ) : (
           <TopnavShell>{content}</TopnavShell>
         )}
-        {/* Mobile bottom nav — sidebar/topnav modes only. In dock mode the
-            edge docks (with liquid glass) carry navigation. */}
-        {effectiveMode !== 'dock' && <MobileBottomNav />}
+        {/* Bottom liquid dock is handled by EdgeDock inside DockShell (hint bar
+            pattern: collapsed → hover/tap opens). No always-visible bottom nav. */}
         {/* In dock mode the mobile pill expands inline (DockShell), so only
             sidebar/topnav need the external CommandLauncher. */}
         {effectiveMode !== 'dock' && <CommandLauncher variant="list" />}
