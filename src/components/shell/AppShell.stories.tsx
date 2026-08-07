@@ -45,7 +45,9 @@ export const Mobile: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('navigation', { name: 'Alt gezinme' })).toBeInTheDocument();
+    // Convergence: below xl the shell shows the mobile bottom bar — now a LiquidDock
+    // (role="tablist", "Ana gezinme"), replacing the old <nav aria-label="Alt gezinme">.
+    await expect(canvas.getByRole('tablist', { name: 'Ana gezinme' })).toBeInTheDocument();
   },
 };
 
@@ -111,9 +113,12 @@ export const Tablet: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'bpLg' } },
   play: async ({ canvas }) => {
-    // Bottom nav is visible at 768 (convergence still active below xl).
-    const bottomNav = canvas.getByRole('navigation', { name: 'Alt gezinme' });
-    await expect(bottomNav.className).toContain('xl:hidden');
+    // Bottom bar (now a LiquidDock "Ana gezinme" tablist) is visible at 768
+    // (convergence still active below xl).
+    const bottomNav = canvas.getByRole('tablist', { name: 'Ana gezinme' });
+    await expect(bottomNav).toBeInTheDocument();
+    // Its fixed wrapper carries `xl:hidden`, so it drops out at xl (see Desktop).
+    await expect(bottomNav.closest('.xl\\:hidden')).not.toBeNull();
     // The sidebar exists in the DOM but its reveal is gated at `xl:flex` (1024), NOT `lg` (768).
     await expect(canvas.getByTestId('sidebar').className).toContain('xl:flex');
   },
@@ -130,8 +135,9 @@ export const Desktop: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'bpXl' } },
   play: async ({ canvas }) => {
-    // At 1024 the bottom nav is hidden → not in the accessibility tree.
-    await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
+    // At 1024 the bottom bar (LiquidDock "Ana gezinme" tablist) is hidden via its
+    // `xl:hidden` wrapper → not in the accessibility tree.
+    await expect(canvas.queryByRole('tablist', { name: 'Ana gezinme' })).toBeNull();
     // The sidebar reveal class is `xl:flex` (visible at 1024).
     await expect(canvas.getByTestId('sidebar').className).toContain('xl:flex');
   },
