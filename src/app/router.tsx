@@ -60,6 +60,7 @@ const AccountSecurityPage = named(
   () => import('@/features/auth/pages/AccountSecurityPage'),
   'AccountSecurityPage',
 );
+const DockLabPage = named(() => import('@/features/lab'), 'DockLabPage');
 
 const meta = (routeMeta: RouteHandle['routeMeta']): RouteHandle => ({ routeMeta });
 
@@ -295,6 +296,11 @@ export const router = createBrowserRouter([
         path: 'account/security',
         Component: AccountSecurityPage,
         handle: meta({ title: 'Hesap ve güvenlik', aiEntity: 'account' }),
+      },
+      {
+        path: 'lab/dock',
+        Component: DockLabPage,
+        handle: meta({ title: 'Dock Lab', aiEntity: 'lab' }),
       },
       { path: '*', Component: () => <PlaceholderPage title="Sayfa bulunamadı" description="Aradığınız sayfa mevcut değil." /> },
     ],
