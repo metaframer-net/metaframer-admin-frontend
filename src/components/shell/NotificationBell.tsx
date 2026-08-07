@@ -125,10 +125,14 @@ export function NotificationBell({ className }: { className?: string }) {
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-safe">
             <SheetHeader className="px-4 pb-2">
-              <SheetTitle className="flex items-center justify-between">
+              {/* Count sits in a badge NEXT TO the title (left group), so it never
+                  collides with the Sheet's auto close (✕) button at top-right. */}
+              <SheetTitle className="flex items-center gap-2">
                 <span>Bildirimler</span>
                 {unread > 0 && (
-                  <span className="text-muted-foreground text-sm font-normal tabular-nums">{unread} bekleyen</span>
+                  <span className="bg-primary text-primary-foreground inline-grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold tabular-nums">
+                    {unread}
+                  </span>
                 )}
               </SheetTitle>
             </SheetHeader>
