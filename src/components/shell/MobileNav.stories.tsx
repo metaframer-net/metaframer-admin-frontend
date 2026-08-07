@@ -20,7 +20,9 @@ type Story = StoryObj<typeof meta>;
 export const Sidebar: Story = {
   globals: { layout: 'sidebar' },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('navigation', { name: 'Alt gezinme' })).toBeInTheDocument();
+    // The mobile bottom bar is now a LiquidDock (role="tablist", "Ana gezinme"),
+    // not the old <nav aria-label="Alt gezinme">.
+    await expect(canvas.getByRole('tablist', { name: 'Ana gezinme' })).toBeInTheDocument();
   },
 };
 
