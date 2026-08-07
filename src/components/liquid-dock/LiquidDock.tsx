@@ -221,45 +221,45 @@ export function LiquidDock({
       if (vert) {
         // main=Y, cross=X
         const crossLeft = cc - cross / 2;
-        lens.style.top = `${s}px`;
-        lens.style.bottom = '';
+        lens!.style.top = `${s}px`;
+        lens!.style.bottom = '';
         // Position relative to the bar's side
         if (side === 'right') {
-          lens.style.right = `${BAR_THICKNESS - crossLeft - cross}px`;
-          lens.style.left = '';
+          lens!.style.right = `${BAR_THICKNESS - crossLeft - cross}px`;
+          lens!.style.left = '';
         } else {
-          lens.style.left = `${crossLeft}px`;
-          lens.style.right = '';
+          lens!.style.left = `${crossLeft}px`;
+          lens!.style.right = '';
         }
-        lens.style.width = `${cross}px`;
-        lens.style.height = `${mainLen}px`;
+        lens!.style.width = `${cross}px`;
+        lens!.style.height = `${mainLen}px`;
       } else {
         // main=X, cross=Y (cc is measured from bar bottom)
         const bottom = cc - cross / 2;
-        lens.style.left = `${s}px`;
-        lens.style.bottom = `${bottom}px`;
-        lens.style.top = '';
-        lens.style.right = '';
-        lens.style.width = `${mainLen}px`;
-        lens.style.height = `${cross}px`;
+        lens!.style.left = `${s}px`;
+        lens!.style.bottom = `${bottom}px`;
+        lens!.style.top = '';
+        lens!.style.right = '';
+        lens!.style.width = `${mainLen}px`;
+        lens!.style.height = `${cross}px`;
       }
-      lens.style.borderRadius = `${radius}px`;
+      lens!.style.borderRadius = `${radius}px`;
     }
 
     function paintDot() {
       const cx = slotCenter(state.currentActive);
       if (vert) {
-        dot.style.top = `${cx}px`;
-        dot.style.transform = 'translateY(-50%)';
-        dot.style.left = side === 'left' ? '6px' : '';
-        dot.style.right = side === 'right' ? '6px' : '';
-        dot.style.bottom = '';
+        dot!.style.top = `${cx}px`;
+        dot!.style.transform = 'translateY(-50%)';
+        dot!.style.left = side === 'left' ? '6px' : '';
+        dot!.style.right = side === 'right' ? '6px' : '';
+        dot!.style.bottom = '';
       } else {
-        dot.style.left = `${cx}px`;
-        dot.style.transform = 'translateX(-50%)';
-        dot.style.bottom = '8px';
-        dot.style.top = '';
-        dot.style.right = '';
+        dot!.style.left = `${cx}px`;
+        dot!.style.transform = 'translateX(-50%)';
+        dot!.style.bottom = '8px';
+        dot!.style.top = '';
+        dot!.style.right = '';
       }
     }
 
@@ -369,7 +369,7 @@ export function LiquidDock({
     /* ── Pointer ── */
 
     function localMain(e: PointerEvent) {
-      const r = bar.getBoundingClientRect();
+      const r = bar!.getBoundingClientRect();
       return vert ? clamp(e.clientY - r.top, 0, r.height) : clamp(e.clientX - r.left, 0, r.width);
     }
 
