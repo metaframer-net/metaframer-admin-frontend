@@ -214,17 +214,19 @@ export const HoverFillsPointedTile: Story = {
 };
 
 /**
- * Desktop only — below xl the edge dock is hidden (`max-xl:hidden`). The full-width
- * command pill carries navigation on mobile, so the edge handles would otherwise
- * peek as stray rectangles beside it. The element still renders (in the DOM) but
- * is `display: none` at a phone width.
+ * Mobile — the edge dock is shown on phones too (dock layout, desktop AND mobile),
+ * so its navigation is available alongside the command pill. It renders and is
+ * visible (not `display: none`) at a phone width, and its collapsed hint stays a
+ * reachable toggle.
  */
-export const MobileHidden: Story = {
+export const MobileVisible: Story = {
   args: { edge: 'bottom' },
   parameters: { viewport: { defaultViewport: 'bpXs' } },
   play: async () => {
     const dock = document.body.querySelector('[data-slot="edge-dock"]');
     if (!(dock instanceof HTMLElement)) throw new Error('edge dock did not render');
-    await expect(getComputedStyle(dock).display).toBe('none');
+    await expect(getComputedStyle(dock).display).not.toBe('none');
+    // Its collapsed hint is a reachable toggle at phone width.
+    await expect(dock.querySelector('[data-slot="edge-dock-hint"]')).not.toBeNull();
   },
 };
