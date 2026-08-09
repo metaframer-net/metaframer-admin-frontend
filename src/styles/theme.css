@@ -215,6 +215,14 @@
   --breakpoint-3xl: 1536px; /* desktop */
   --breakpoint-4xl: 1920px; /* wide desktop */
 
+  /* Layout — page content container (PageContainer). Pages render at 80% width,
+     centered (≈10% gutters each side) from `xl` (1024) up; below that they fill
+     the shell's <main>. This cap keeps line lengths readable on ultra-wide
+     displays: once 80% would exceed it, the container stops growing and stays
+     centered. Exposed as the `max-w-page` utility. Single source of truth — change
+     the cap here; opt a page out entirely via `routeMeta.fullWidth`. */
+  --container-page: 1600px;
+
   /* Typography */
   --font-sans: 'Geist Variable', 'Inter Variable', system-ui, -apple-system,
     'Segoe UI', Roboto, Arial, sans-serif;
