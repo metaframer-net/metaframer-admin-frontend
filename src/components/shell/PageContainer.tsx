@@ -9,19 +9,19 @@ import { hasRouteMeta } from '@/app/route-meta';
  * The single place the "pages live at 80% width" rule is expressed.
  *
  * - `contained` (default): below `xl` (1024) the content fills the shell's
- *   `<main>`; from `xl` up it centers at 80% (≈10% gutters each side) and stops
- *   growing at the `--container-page` cap (`max-w-page`) so line lengths stay
- *   readable on ultra-wide displays.
- * - `full`: edge-to-edge, no centering or cap.
+ *   `<main>`; from `xl` up it centers at 80% — exactly ≈10% gutters each side at
+ *   EVERY width (no max-width cap, so the 80/10/10 ratio is constant, including on
+ *   ultra-wide displays).
+ * - `full`: edge-to-edge, no centering.
  *
- * Change the width/cap/breakpoint here (and `--container-page` in theme.css);
- * nothing is baked into individual pages. A page opts out per-route by setting
- * `routeMeta.fullWidth: true`, which this component reads from the active match.
+ * Change the width/breakpoint here; nothing is baked into individual pages. A page
+ * opts out per-route by setting `routeMeta.fullWidth: true`, read from the active
+ * match.
  */
 const pageContainerVariants = cva('w-full', {
   variants: {
     variant: {
-      contained: 'xl:mx-auto xl:w-4/5 xl:max-w-page',
+      contained: 'xl:mx-auto xl:w-4/5',
       full: '',
     },
   },

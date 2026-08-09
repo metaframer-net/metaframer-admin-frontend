@@ -138,9 +138,9 @@ Mobile-first. **Both shells + the data table converge to drawer + bottom nav / c
 
 ## Page container (width rule — HARD default)
 Every page renders inside `PageContainer` (`src/components/shell/PageContainer.tsx`), wired once in `AppShell` so it applies to ALL current and future pages automatically — pages themselves add nothing.
-- **Default (`contained`):** below `xl` (1024) the page fills the shell's `<main>`; from `xl` up it centers at **80% width** (≈10% gutters each side) and stops growing at the `--container-page` cap (`max-w-page`, currently **1600px**) so line lengths stay readable on ultra-wide displays.
+- **Default (`contained`):** below `xl` (1024) the page fills the shell's `<main>`; from `xl` up it centers at **80% width** — exactly **10% gutters each side at every width** (no max-width cap, so the 80/10/10 ratio stays constant, including on ultra-wide displays).
 - **Opt-out (per route):** set `routeMeta.fullWidth: true` on the route (`handle.routeMeta`) to render that page edge-to-edge (maps, wide tables/dashboards). No component changes needed; `PageContainer` reads it from the active match.
-- **Single source of truth:** change the width (`xl:w-4/5`), breakpoint, or cap in `PageContainer` + `--container-page` in `theme.css` — never re-implement gutters per page. The 80% gutters are auto-margins for centering, distinct from the ≤12px spacing hard limits.
+- **Single source of truth:** change the width (`xl:w-4/5`) or breakpoint in `PageContainer` — never re-implement gutters per page. The 80% gutters are auto-margins for centering, distinct from the ≤12px spacing hard limits.
 
 ## Density modes
 `comfortable` (default) and `compact`. Density changes row height, control padding, and font-size step on tables/forms via a `data-density` attribute on the shell root; tokens read it.
