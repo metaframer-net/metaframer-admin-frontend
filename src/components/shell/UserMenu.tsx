@@ -29,11 +29,19 @@ function initials(name: string): string {
 }
 
 /** Current-user menu. In dev it also exposes a role switcher to preview RBAC gating. */
-export function UserMenu({ className }: { className?: string }) {
+export function UserMenu({
+  className,
+  onOpenChange,
+}: {
+  className?: string;
+  /** Notifies the host when the menu opens/closes (the dock keeps itself engaged
+      while it is open, since the menu content portals out of the dock DOM). */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { user, setRole } = useSession();
   const logout = useLogout();
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => onOpenChange?.(open)}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

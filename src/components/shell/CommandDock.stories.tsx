@@ -269,3 +269,43 @@ export const NotificationsOff: Story = {
     await expect(body.queryByRole('button', { name: /Bildirimler/ })).toBeNull();
   },
 };
+
+/**
+ * Menu-hold: the notification bell and the user menu sit in the engaged-only
+ * reveal but open their OWN Radix layer, whose content portals OUT of the dock —
+ * so `:hover`/`:focus-within` drop and the pill would otherwise collapse out from
+ * under the open menu (detaching it, hiding its trigger). The dock tracks their
+ * open state and holds itself engaged (`data-hold`) until the menu closes.
+ */
+export const MenuHoldsEngaged: Story = {
+  parameters: { viewport: { defaultViewport: 'bpXl' } },
+  play: async () => {
+    const body = within(document.body);
+    const dock = document.querySelector('[data-entity="dock"]') as HTMLElement;
+    // Capture both triggers up front — both are in the DOM at rest (the user menu
+    // lives in the reveal but stays mounted). Re-querying AFTER a menu closed is
+    // flaky: a modal Radix menu adds `aria-hidden` to outside content on open.
+    const bellBtn = body.getByRole('button', { name: /Bildirimler/ });
+    const userBtn = body.getByRole('button', { name: 'Kullanıcı menüsü' });
+    // At rest the pill is not held.
+    await expect(dock).not.toHaveAttribute('data-hold');
+
+    // Notification bell (always visible in the resting pill): its popover portals
+    // out of the dock, so on open `:hover`/`:focus-within` drop — the hold is what
+    // keeps the pill engaged instead of collapsing out from under the open popover.
+    await userEvent.click(bellBtn);
+    await waitFor(() => expect(dock).toHaveAttribute('data-hold', 'true'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(dock).not.toHaveAttribute('data-hold'));
+
+    // User menu lives in the focus/hover reveal. Focus its trigger (activates the
+    // reveal via :focus-within), then open it from the keyboard. Opening moves focus
+    // INTO the portaled menu, so the dock loses :focus-within — again the hold is
+    // what keeps the pill engaged.
+    userBtn.focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(dock).toHaveAttribute('data-hold', 'true'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(dock).not.toHaveAttribute('data-hold'));
+  },
+};
