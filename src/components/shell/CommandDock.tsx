@@ -361,6 +361,15 @@ export function CommandDock({ now, className }: CommandDockProps) {
     setInstant(source === 'keyboard');
   }
 
+  // The notification bell and the user menu are the two controls that live inside
+  // the engaged-only reveal but open their OWN Radix layer (popover / dropdown).
+  // That content portals to <body>, so once it opens the dock loses both `:hover`
+  // and `:focus-within` and would collapse the reveal out from under the open
+  // menu — detaching it and hiding its trigger. We track their open state and hold
+  // the pill engaged (`data-hold`) until the menu closes; no panel is opened.
+  const [heldBy, setHeldBy] = useState({ bell: false, user: false });
+  const held = heldBy.bell || heldBy.user;
+
   // Mount on open (adjusted during render, so the panel is in the DOM for the
   // very first frame of the unfold), and stay mounted through the collapse so
   // the fold-back is visible. Unmounting on the way out is what resets the
@@ -465,6 +474,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
           className,
         )}
         data-open={panelOpen ? 'true' : 'false'}
+        data-hold={held ? 'true' : undefined}
         data-instant={instant ? 'true' : undefined}
         aria-label="Komut çubuğu"
         data-entity="dock"
@@ -576,11 +586,17 @@ export function CommandDock({ now, className }: CommandDockProps) {
               which reads as a jarring filled box on the glass chrome). */}
           <div className="flex shrink-0 items-center gap-1" data-dock-exclude>
             {notificationsEnabled && (
-              <NotificationBell className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent" />
+              <NotificationBell
+                className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent"
+                onOpenChange={(o) => setHeldBy((s) => ({ ...s, bell: o }))}
+              />
             )}
             <span className="dock-reveal">
               <span>
-                <UserMenu className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent" />
+                <UserMenu
+                  className="hover:bg-glass-foreground/10 hover:text-glass-foreground focus-visible:ring-0 focus-visible:border-transparent"
+                  onOpenChange={(o) => setHeldBy((s) => ({ ...s, user: o }))}
+                />
               </span>
             </span>
           </div>
