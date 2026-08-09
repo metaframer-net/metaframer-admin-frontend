@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { useFeatureFlag } from '@/lib/settings/feature-flags-store';
 import { CommandDock } from './CommandDock';
 import { EdgeDock } from './EdgeDock';
+import { EdgeDockScrimProvider } from './edge-dock-scrim';
 
 export interface DockShellProps {
   children: ReactNode;
@@ -26,15 +27,22 @@ export function DockShell({ children, now }: DockShellProps) {
   const edgeBottom = useFeatureFlag('edgeDockBottom');
   const edgeLeft = useFeatureFlag('edgeDockLeft');
   const edgeRight = useFeatureFlag('edgeDockRight');
+  const anyEdge = edgeBottom || edgeLeft || edgeRight;
 
   return (
     <div className="flex min-h-svh flex-col overflow-x-hidden">
       {/* Floating command dock — responsive host for all breakpoints. */}
       <CommandDock now={now} />
 
-      {edgeBottom && <EdgeDock edge="bottom" />}
-      {edgeLeft && <EdgeDock edge="left" />}
-      {edgeRight && <EdgeDock edge="right" />}
+      {/* One shared backdrop for every ear (EdgeDockScrimProvider) so the page
+          dims exactly once regardless of how many are open. */}
+      {anyEdge && (
+        <EdgeDockScrimProvider>
+          {edgeBottom && <EdgeDock edge="bottom" />}
+          {edgeLeft && <EdgeDock edge="left" />}
+          {edgeRight && <EdgeDock edge="right" />}
+        </EdgeDockScrimProvider>
+      )}
 
       <main className="flex-1 overflow-x-hidden p-4 pb-20 pt-20 xl:pb-6" data-density-scope>
         {children}
