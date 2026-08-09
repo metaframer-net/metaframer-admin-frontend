@@ -463,9 +463,13 @@ export function CommandDock({ now, className }: CommandDockProps) {
 
   return (
     <>
-      {/* Backdrop — dims and de-focuses the page the panel floats over. */}
+      {/* Backdrop — dims and de-focuses the page the panel floats over. Rendered at
+          EVERY breakpoint: on mobile it both darkens the page behind the open island
+          and catches an outside tap to dismiss (the pill sits above it at z-40, so
+          tapping the pill still toggles). Previously `hidden xl:block` left mobile
+          with no backdrop, so only the ✕ could close it and the page never dimmed. */}
       {rendered && (
-        <Scrim open={panelOpen} onClick={() => setOpen(false)} zIndex={30} className="hidden xl:block" />
+        <Scrim open={panelOpen} onClick={() => setOpen(false)} zIndex={30} />
       )}
 
       <div

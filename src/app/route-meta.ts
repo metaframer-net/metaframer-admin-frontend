@@ -8,6 +8,12 @@ export interface RouteMeta {
   title: string;
   permission?: Permission;
   aiEntity?: string;
+  /**
+   * Opt this route out of the default 80%-centered page container and render it
+   * full-width instead (e.g. maps, edge-to-edge tables/dashboards). Read by
+   * {@link PageContainer} via the matched routes. Omit for the standard layout.
+   */
+  fullWidth?: boolean;
 }
 
 export interface RouteHandle {

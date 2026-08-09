@@ -9,6 +9,7 @@ import { PageSkeleton } from '@/app/pages/PageSkeleton';
 import { CommandPaletteProvider } from './command-palette-context';
 import { CommandLauncher } from './CommandLauncher';
 import { DockShell } from './DockShell';
+import { PageContainer } from './PageContainer';
 import { RouteGuard } from './RouteGuard';
 import { SidebarShell } from './SidebarShell';
 import { TopnavShell } from './TopnavShell';
@@ -31,12 +32,20 @@ export function AppShell({ children }: AppShellProps) {
   const effectiveMode =
     config.mode === 'dock' && !dockEnabled ? 'sidebar' : config.mode;
 
-  const content = children ?? (
-    <RouteGuard>
-      <Suspense fallback={<PageSkeleton />}>
-        <Outlet />
-      </Suspense>
-    </RouteGuard>
+  // Single insertion point for the page container rule: whichever shell is
+  // active renders this inside its <main>, so every page (and every future one)
+  // gets the 80%-centered layout for free. Per-route opt-out via
+  // `routeMeta.fullWidth` is read inside PageContainer.
+  const content = (
+    <PageContainer>
+      {children ?? (
+        <RouteGuard>
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
+        </RouteGuard>
+      )}
+    </PageContainer>
   );
 
   return (
