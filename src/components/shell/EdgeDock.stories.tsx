@@ -23,37 +23,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The revealed dock is a LiquidDock: a `role="tablist"` (aria-label "Ana gezinme")
- * of icon tabs — the permitted primary nav + a trailing "Ara" (⌘K) tab. There is no
- * `<nav>`/link markup and no growing capsule (that was the earlier MagnifyDock); the
- * lens is a fixed-size circle that SLIDES onto the pointed tile, and the pointed tile's
- * icon crossfades from its outline to its filled variant.
- */
-
-/** Open the collapsed dock via its hint and return the revealed LiquidDock tablist. */
-async function openDock(): Promise<HTMLElement> {
-  const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
-  await userEvent.click(hint);
-  await expect(hint).toHaveAttribute('aria-expanded', 'true');
-  return within(document.body).getByRole('tablist', { name: 'Ana gezinme' });
-}
-
-/** Resolve the LiquidDock DOM handles the pointer tests drive. */
-function dockParts(tablist: HTMLElement) {
-  const tabs = within(tablist).getAllByRole('tab');
-  const track = tabs[0]?.parentElement ?? null; // flex row holding the tiles
-  const bar = track?.parentElement ?? null; // glass bar — owns the pointer handlers
-  // The lens is the only aria-hidden <div> that is a direct child of the tablist
-  // (the active-dot lives inside the bar; the vertical tooltip is a <span>).
-  const lens = tablist.querySelector<HTMLElement>(':scope > div[aria-hidden="true"]');
-  return { tabs, track, bar, lens };
-}
-
-/**
  * Bottom edge — a collapsed hint tab that opens (hover / focus / tap) into the
- * LiquidDock. It rests COLLAPSED: three standing rails would wall the content in.
- * Play asserts the collapse→open result: the permitted nav tabs + the "Ara" tab are
- * present and the active route's tab is selected.
+ * liquid-glass LiquidDock (a `tablist` named "Ana gezinme"). It rests COLLAPSED:
+ * three standing rails would wall the content in. Play asserts the collapse→open
+ * result: the primary nav tabs + the ⌘K "Ara" tab become available, and the
+ * current route's tab is selected.
  */
 export const Bottom: Story = {
   args: { edge: 'bottom' },
@@ -61,24 +35,25 @@ export const Bottom: Story = {
     const body = within(document.body);
     const hint = body.getByRole('button', { name: /Gezinme dock.*aç/ });
     await expect(hint).toHaveAttribute('aria-expanded', 'false');
-
-    const tablist = await openDock();
-    const tabs = within(tablist).getAllByRole('tab');
-    await expect(tabs.length).toBeGreaterThan(1);
-    // The trailing search tab (⌘K "all") is always present.
-    await expect(within(tablist).getByRole('tab', { name: 'Ara' })).toBeInTheDocument();
-    // Exactly one tab is selected — the active route (or index 0 as the fallback).
-    await expect(tablist.querySelector('[role="tab"][aria-selected="true"]')).toBeTruthy();
+    // Open it → the permitted primary nav + the ⌘K "Ara" tab become available.
+    await userEvent.click(hint);
+    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    await expect(body.getByRole('tablist', { name: 'Ana gezinme' })).toBeInTheDocument();
+    await expect(body.getByRole('tab', { name: 'Genel' })).toBeInTheDocument();
+    await expect(body.getByRole('tab', { name: 'Ara' })).toBeInTheDocument();
+    // The active route ("/") maps to the first tab — it is the selected one.
+    await expect(body.getByRole('tab', { name: 'Genel' })).toHaveAttribute('aria-selected', 'true');
   },
 };
 
-/** Left edge — vertical LiquidDock (icons stack; labels move to a side tooltip). */
+/** Left edge — vertical LiquidDock; icon + label stack along the vertical axis. */
 export const Left: Story = {
   args: { edge: 'left' },
   play: async () => {
-    const tablist = await openDock();
-    await expect(within(tablist).getAllByRole('tab').length).toBeGreaterThan(1);
-    await expect(within(tablist).getByRole('tab', { name: 'Ara' })).toBeInTheDocument();
+    const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
+    await userEvent.click(hint);
+    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    await expect(within(document.body).getByRole('tab', { name: 'Genel' })).toBeInTheDocument();
   },
 };
 
@@ -86,17 +61,20 @@ export const Left: Story = {
 export const Right: Story = {
   args: { edge: 'right' },
   play: async () => {
-    const tablist = await openDock();
-    await expect(within(tablist).getAllByRole('tab').length).toBeGreaterThan(1);
-    await expect(within(tablist).getByRole('tab', { name: 'Ara' })).toBeInTheDocument();
+    const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
+    await userEvent.click(hint);
+    await expect(hint).toHaveAttribute('aria-expanded', 'true');
+    await expect(within(document.body).getByRole('tab', { name: 'Genel' })).toBeInTheDocument();
   },
 };
 
 /**
  * Keyboard: focusing the hint opens the dock and Escape closes it, restoring focus —
  * INCLUDING after focus has tabbed into the tiles (regression guard: the hint's focus
- * handler must not re-open the dock while focus is being restored). Tabbing off the
- * hint lands on the dock's active tab (the only one in the tab order).
+ * handler must not re-open the dock while focus is being restored). There is no
+ * floating tooltip any more — every tile shows its own stacked label — so the
+ * closest equivalent assertion is that the focused tab carries the expected
+ * visible `[data-slot="label"]` text.
  */
 export const Keyboard: Story = {
   args: { edge: 'bottom' },
@@ -107,10 +85,14 @@ export const Keyboard: Story = {
     // (asserting once races the state update on slower/headless runners).
     await waitFor(() => expect(hint).toHaveAttribute('aria-expanded', 'true'));
 
-    // Move focus off the hint into the dock — it lands on the active tab (tabIndex 0;
-    // the rest are roving-tabindex -1).
+    // Move focus off the hint into the active nav tab (the only tabbable tile).
     await userEvent.tab();
-    await waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('tab'));
+    await waitFor(() => {
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLElement)) throw new Error('nothing focused');
+      expect(focused).toHaveAttribute('role', 'tab');
+      expect(focused.querySelector('[data-slot="label"]')?.textContent).toBe('Genel');
+    });
 
     await userEvent.keyboard('{Escape}');
     await expect(hint).toHaveAttribute('aria-expanded', 'false');
@@ -119,87 +101,85 @@ export const Keyboard: Story = {
 };
 
 /**
- * Hovering an icon SLIDES the circular lens onto it (regression guard for the
- * "hover → circle" contract): the lens starts on the active route and moves toward the
- * pointed-at tile. Pointer handlers live on the glass bar, so the move is dispatched
- * there.
+ * Hovering a tile glides the liquid lens onto it (regression guard for the
+ * "hover → lens" contract): the lens rests on the active route's slot and springs
+ * to the pointed-at tile's slot centre.
  */
 export const HoverLens: Story = {
   args: { edge: 'bottom' },
   play: async () => {
-    const tablist = await openDock();
-    const { bar, lens } = dockParts(tablist);
-    if (!(bar instanceof HTMLElement) || !(lens instanceof HTMLElement)) {
-      throw new Error('dock bar/lens did not render');
-    }
-    const restLeft = parseFloat(lens.style.left) || 0;
+    const body = within(document.body);
+    await userEvent.click(body.getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const tablist = body.getByRole('tablist', { name: 'Ana gezinme' });
+    const lens = tablist.querySelector('[data-slot="dock-lens"]');
+    if (!(lens instanceof HTMLElement)) throw new Error('dock lens did not render');
+    const restLeft = lens.style.left;
 
-    // Point at the far (right) end — never the resting active tile at the left.
-    const rect = bar.getBoundingClientRect();
-    const y = rect.top + rect.height / 2;
-    const targetX = rect.right - 12;
+    // Point at the LAST tab (the ⌘K "Ara" action) — never the resting active one.
+    const tabs = within(tablist).getAllByRole('tab');
+    const last = tabs[tabs.length - 1];
+    if (!last) throw new Error('no dock tabs');
 
-    // The lens glides to the pointed-at slot via a per-frame rAF lerp, and that loop only
-    // reschedules while it is still moving. Its frame cadence is irregular under headless
-    // CI load, so re-dispatch the move on EVERY poll: each one re-arms the rAF loop, so the
-    // lens keeps converging no matter how the runner schedules frames. Deterministic.
+    // The lens glides via a per-frame rAF spring, and that loop only reschedules
+    // while it is still moving. Its frame cadence is irregular under headless CI
+    // load, so re-dispatch the hover move on EVERY poll: each one re-arms the rAF
+    // loop, so the lens keeps converging no matter how frames are scheduled.
     await waitFor(
       () => {
-        bar.dispatchEvent(
+        const lastRect = last.getBoundingClientRect();
+        last.dispatchEvent(
           new PointerEvent('pointermove', {
             pointerType: 'mouse',
-            clientX: targetX,
-            clientY: y,
+            clientX: lastRect.left + lastRect.width / 2,
+            clientY: lastRect.top + lastRect.height / 2,
             bubbles: true,
           }),
         );
-        // It has slid a meaningful distance to the right, toward the pointer.
-        expect(parseFloat(lens.style.left)).toBeGreaterThan(restLeft + 4);
+        // Lens centre landed on the hovered tab's slot centre (within ~1px).
+        // `style.left` is relative to the tablist wrapper, which shares its left
+        // edge with the glass bar in the horizontal orientation.
+        const wrapperRect = tablist.getBoundingClientRect();
+        const target = lastRect.left + lastRect.width / 2 - wrapperRect.left;
+        const centre = parseFloat(lens.style.left) + lens.getBoundingClientRect().width / 2;
+        expect(Math.abs(centre - target)).toBeLessThan(1.5);
       },
       { timeout: 5000 },
     );
+    // …and it genuinely left its resting position (it started on the active tab).
+    expect(lens.style.left).not.toBe(restLeft);
   },
 };
 
 /**
- * The dock is permissions-driven and holds no async data, so it has no distinct
- * loading / empty / error surfaces — these stubs render the resting dock and exist only
- * for state-set parity with the sibling shell components (Storybook-first rule).
- */
-export const Loading: Story = { args: { edge: 'bottom' } };
-export const Empty: Story = { args: { edge: 'bottom' } };
-export const ErrorState: Story = { args: { edge: 'bottom' }, name: 'Error' };
-
-/**
- * Magnification in LiquidDock is a CROSSFADE, not a scale (regression guard): the tile
- * under the lens swaps its outline icon for the filled variant. Driving the pointer onto
- * the last tile must fade its filled icon in (and its outline out).
+ * Hovering a tile crossfades its icon from outline to filled as the lens overlap
+ * grows (regression guard for the icon fill contract, ported from the sibling
+ * branch's "Magnifies (icon crossfade)" story).
  */
 export const HoverFillsPointedTile: Story = {
-  name: 'Magnifies (icon crossfade)',
+  name: 'Hover fills pointed tile',
   args: { edge: 'bottom' },
   play: async () => {
-    const tablist = await openDock();
-    const { tabs, bar } = dockParts(tablist);
-    if (!(bar instanceof HTMLElement)) throw new Error('dock bar did not render');
+    const body = within(document.body);
+    await userEvent.click(body.getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const tablist = body.getByRole('tablist', { name: 'Ana gezinme' });
+    const tabs = within(tablist).getAllByRole('tab');
     const last = tabs[tabs.length - 1];
     const filled = last?.querySelector<SVGElement>('[data-variant="filled"]');
     const outline = last?.querySelector<SVGElement>('[data-variant="outline"]');
-    if (!(filled instanceof SVGElement) || !(outline instanceof SVGElement)) {
+    if (!(filled instanceof SVGElement) || !(outline instanceof SVGElement) || !last) {
       throw new Error('dock tile icons did not render');
     }
 
-    const rect = bar.getBoundingClientRect();
-    const y = rect.top + rect.height / 2;
-    const targetX = rect.right - 12; // the last tile
-
+    // Re-dispatch the hover on every poll — the rAF spring only reschedules
+    // while moving, and headless frame cadence is irregular (see HoverLens).
     await waitFor(
       () => {
-        bar.dispatchEvent(
+        const rect = last.getBoundingClientRect();
+        last.dispatchEvent(
           new PointerEvent('pointermove', {
             pointerType: 'mouse',
-            clientX: targetX,
-            clientY: y,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
             bubbles: true,
           }),
         );
@@ -214,10 +194,64 @@ export const HoverFillsPointedTile: Story = {
 };
 
 /**
- * Mobile — the edge dock is shown on phones too (dock layout, desktop AND mobile),
- * so its navigation is available alongside the command pill. It renders and is
- * visible (not `display: none`) at a phone width, and its collapsed hint stays a
- * reachable toggle.
+ * The dock is permissions-driven and holds no async data, so it has no distinct
+ * loading / empty / error surfaces — these stubs render the resting dock and exist only
+ * for state-set parity with the sibling shell components (Storybook-first rule).
+ */
+export const Loading: Story = { args: { edge: 'bottom' } };
+export const Empty: Story = { args: { edge: 'bottom' } };
+export const ErrorState: Story = { args: { edge: 'bottom' }, name: 'Error' };
+
+/**
+ * No-overflow guard, successor of the old "magnification grows the capsule" story.
+ * The current dock does not magnify tiles — a fixed glass bar carries equal-width
+ * tab slots and a traveling lens — so the surviving contract is containment: every
+ * tab slot stays inside the glass bar on the main axis, even while the pointer
+ * hovers the far end and the lens springs after it.
+ */
+export const NoOverflow: Story = {
+  args: { edge: 'bottom' },
+  play: async () => {
+    const body = within(document.body);
+    await userEvent.click(body.getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const tablist = body.getByRole('tablist', { name: 'Ana gezinme' });
+    const tabs = within(tablist).getAllByRole('tab');
+    await expect(tabs.length).toBeGreaterThan(1);
+    const first = tabs[0];
+    const last = tabs[tabs.length - 1];
+    if (!first || !last) throw new Error('no dock tabs');
+    // The glass bar is the tabs' track's parent (the element with the pill radius).
+    const bar = first.parentElement?.parentElement;
+    if (!(bar instanceof HTMLElement)) throw new Error('dock bar did not render');
+
+    // Hover the far end so the lens springs after the pointer, then verify
+    // containment holds while it travels and after it settles.
+    const lastRect = last.getBoundingClientRect();
+    last.dispatchEvent(
+      new PointerEvent('pointermove', {
+        pointerType: 'mouse',
+        clientX: lastRect.left + lastRect.width / 2,
+        clientY: lastRect.top + lastRect.height / 2,
+        bubbles: true,
+      }),
+    );
+
+    await waitFor(() => {
+      const barRect = bar.getBoundingClientRect();
+      for (const tab of tabs) {
+        const b = tab.getBoundingClientRect();
+        expect(b.left).toBeGreaterThanOrEqual(barRect.left - 0.5);
+        expect(b.right).toBeLessThanOrEqual(barRect.right + 0.5);
+      }
+    });
+  },
+};
+
+/**
+ * Mobile — the edge dock is shown on phones too (dock layout, desktop AND mobile;
+ * the hint tab is a 44px touch target), so its navigation is available alongside
+ * the command pill. It renders visible (not `display: none`) at a phone width,
+ * and a tap on the collapsed hint must open the dock.
  */
 export const MobileVisible: Story = {
   args: { edge: 'bottom' },
@@ -226,7 +260,9 @@ export const MobileVisible: Story = {
     const dock = document.body.querySelector('[data-slot="edge-dock"]');
     if (!(dock instanceof HTMLElement)) throw new Error('edge dock did not render');
     await expect(getComputedStyle(dock).display).not.toBe('none');
-    // Its collapsed hint is a reachable toggle at phone width.
-    await expect(dock.querySelector('[data-slot="edge-dock-hint"]')).not.toBeNull();
+    // Its collapsed hint is a reachable toggle at phone width — and a tap opens it.
+    const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
+    await userEvent.click(hint);
+    await expect(hint).toHaveAttribute('aria-expanded', 'true');
   },
 };

@@ -41,14 +41,21 @@ export const Topnav: Story = {
   },
 };
 
+/**
+ * Sidebar mode on a phone: there is no always-on bottom nav any more — the shell
+ * converges to the drawer (hamburger in the top bar) + ⌘K command palette. The
+ * persistent sidebar stays CSS-hidden below `xl`, so it is out of the a11y tree.
+ */
 export const Mobile: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    // Convergence below xl: the persistent sidebar is CSS-hidden and navigation is
-    // reached through the top bar's mobile drawer trigger. The old always-open
-    // bottom nav was removed — there is no bottom tablist any more.
+    // Convergence below xl: navigation is reached through the top bar's mobile
+    // drawer trigger.
     await expect(canvas.getByRole('button', { name: 'Menüyü aç' })).toBeInTheDocument();
+    // The persistent sidebar nav is display:none below xl → absent from the a11y
+    // tree — and the old always-open bottom nav (a tablist) stays removed.
+    await expect(canvas.queryByRole('navigation', { name: 'Ana gezinme' })).toBeNull();
     await expect(canvas.queryByRole('tablist', { name: 'Ana gezinme' })).toBeNull();
   },
 };
@@ -69,15 +76,15 @@ export const Dock: Story = {
 };
 
 /**
- * Dock mode on a phone: unlike sidebar/topnav (which converge to the bottom nav),
- * dock mode has NO bottom bar — navigation is carried by the floating command pill,
- * the edge nav docks and ⌘K. Guards the AppShell `effectiveMode !== 'dock'` gate.
+ * Dock mode on a phone: there is no always-on bottom bar — navigation is carried
+ * by the floating command pill, the collapsed edge-dock hint tabs (which now serve
+ * mobile too, since the always-open MobileBottomNav was removed) and ⌘K.
  */
 export const DockMobile: Story = {
   globals: { layout: 'dock' },
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    // The mobile bottom nav is intentionally absent in dock mode.
+    // No always-on bottom nav in dock mode.
     await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
     // The floating command pill's launcher carries navigation.
     await expect(canvas.getByRole('button', { name: /menü ve komut aramayı aç/i })).toBeInTheDocument();
@@ -115,8 +122,8 @@ export const Tablet: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'bpLg' } },
   play: async ({ canvas }) => {
-    // Convergence still active below xl: the mobile drawer trigger (its own wrapper
-    // is `xl:hidden`) is reachable at 768, and there is no bottom tablist.
+    // Convergence still active below xl: the mobile drawer trigger (itself or its
+    // wrapper `xl:hidden`) is reachable at 768, and there is no bottom tablist.
     const drawer = canvas.getByRole('button', { name: 'Menüyü aç' });
     await expect(drawer).toBeInTheDocument();
     await expect(drawer.closest('.xl\\:hidden')).not.toBeNull();
@@ -129,19 +136,19 @@ export const Tablet: Story = {
 /**
  * Desktop (1024px) — the `xl` threshold where the persistent sidebar takes over.
  * Verifies Strategy A: convergence was remapped from `lg` (now 768) to `xl` (1024),
- * so at 1024 the bottom nav is `display:none` (absent from the a11y tree) while the
- * sidebar is revealed. That the bottom nav drops out here — but is present at 768
+ * so at 1024 the drawer trigger is `display:none` (absent from the a11y tree) while
+ * the sidebar is revealed. That the trigger drops out here — but is present at 768
  * above — proves the switch point stayed at 1024, not 768.
  */
 export const Desktop: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'bpXl' } },
   play: async ({ canvas }) => {
-    // At 1024 the bottom bar (LiquidDock "Ana gezinme" tablist) is hidden via its
-    // `xl:hidden` wrapper → not in the accessibility tree.
-    await expect(canvas.queryByRole('tablist', { name: 'Ana gezinme' })).toBeNull();
+    // At 1024 the drawer trigger is hidden → not in the accessibility tree.
+    await expect(canvas.queryByRole('button', { name: 'Menüyü aç' })).toBeNull();
     // The sidebar reveal class is `xl:flex` (visible at 1024).
     await expect(canvas.getByTestId('sidebar').className).toContain('xl:flex');
+    await expect(canvas.getByRole('navigation', { name: 'Ana gezinme' })).toBeInTheDocument();
   },
 };
 

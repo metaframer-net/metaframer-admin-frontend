@@ -17,12 +17,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * MobileBottomNav renders the liquid-glass LiquidDock (a `tablist` named
+ * "Ana gezinme"): primary nav tabs + a ⌘K "Ara" tab, with the current route's
+ * tab selected.
+ */
 export const Sidebar: Story = {
   globals: { layout: 'sidebar' },
   play: async ({ canvas }) => {
-    // The mobile bottom bar is now a LiquidDock (role="tablist", "Ana gezinme"),
-    // not the old <nav aria-label="Alt gezinme">.
-    await expect(canvas.getByRole('tablist', { name: 'Ana gezinme' })).toBeInTheDocument();
+    const dock = canvas.getByRole('tablist', { name: 'Ana gezinme' });
+    const tabs = within(dock).getAllByRole('tab');
+    await expect(tabs.length).toBeGreaterThan(1);
+    await expect(within(dock).getByRole('tab', { name: 'Ara' })).toBeInTheDocument();
+    // The active route ("/") maps to the first tab — it is the selected one.
+    await expect(within(dock).getByRole('tab', { name: 'Genel' })).toHaveAttribute('aria-selected', 'true');
   },
 };
 
