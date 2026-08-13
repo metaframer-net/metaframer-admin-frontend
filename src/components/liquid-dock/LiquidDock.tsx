@@ -24,9 +24,9 @@ export interface LiquidDockProps {
   onSelect?: ((idx: number) => void) | undefined;
   /** Called when the spring settles after a tab change (not on active-tab pulse). */
   onSettled?: (() => void) | undefined;
-  /** Default: 'horizontal'. Vertical docks show icon-only with side tooltips. */
+  /** Default: 'horizontal'. Both orientations render the same icon + label stack. */
   orientation?: DockOrientation | undefined;
-  /** For vertical: which side the dock sits on (tooltip direction). */
+  /** For vertical: which side the dock sits on (dot/lens alignment). */
   side?: 'left' | 'right' | undefined;
 }
 
@@ -37,6 +37,7 @@ const BAR_RADIUS = 33;
 const LENS_BASE = 60;
 const ICON_SIZE = 26;
 const DOT_SIZE = 4;
+const LABEL_BLOCK = 14; // label height (~12px) + gap (2px)
 // No fixed overhang constant — lens position derived from icon centre.
 
 const LEAD_STIFFNESS = 420;
@@ -104,29 +105,37 @@ export function LiquidDock({
   const barRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLSpanElement>(null);
-  const tipRef = useRef<HTMLSpanElement>(null);
   const iconRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const springRef = useRef<{
     start: Edge; end: Edge; currentActive: number; initialized: boolean;
-  }>({ start: { x: 0, v: 0, target: 0 }, end: { x: 0, v: 0, target: 0 }, currentActive: activeIndex, initialized: false });
+    /** True after a tab change until the spring settles. Lives in the ref (not
+     *  the effect closure) because selecting a tab navigates, which re-runs the
+     *  effect with the new activeIndex mid-flight — the onSettled contract must
+     *  survive that remount or the dock never closes. */
+    traveling: boolean;
+  }>({ start: { x: 0, v: 0, target: 0 }, end: { x: 0, v: 0, target: 0 }, currentActive: activeIndex, initialized: false, traveling: false });
 
   const onSelectStable = useRef(onSelect);
   const onSettledStable = useRef(onSettled);
   useLayoutEffect(() => { onSelectStable.current = onSelect; onSettledStable.current = onSettled; });
 
   useLayoutEffect(() => {
-    const bar = barRef.current;
-    const lens = lensRef.current;
-    const dot = dotRef.current;
-    const tip = tipRef.current;
-    if (!bar || !lens || !dot) return;
+    const barMaybe = barRef.current;
+    const lensMaybe = lensRef.current;
+    const dotMaybe = dotRef.current;
+    if (!barMaybe || !lensMaybe || !dotMaybe) return;
+    // Non-null-typed aliases: hoisted function declarations below don't see
+    // the guard's narrowing, so bind the narrowed values to fresh consts.
+    const bar = barMaybe;
+    const lens = lensMaybe;
+    const dot = dotMaybe;
 
     const containers = iconRefs.current;
     const state = springRef.current;
 
     // Main-axis helpers (horizontal: width/x, vertical: height/y)
-    function barMain() { return vert ? bar!.offsetHeight : bar!.offsetWidth; }
+    function barMain() { return vert ? bar.offsetHeight : bar.offsetWidth; }
     function slotSize() { return barMain() / count; }
     function slotCenter(i: number) { return slotSize() * i + slotSize() / 2; }
     function slotStart(i: number) { return slotCenter(i) - LENS_BASE / 2; }
@@ -140,9 +149,16 @@ export function LiquidDock({
     let running = false;
     let raf = 0;
     let lastTime = 0;
-    let traveling = false; // true after a tab change, until spring settles
-    let safetyTimer = 0;   // fallback if onRest never fires
+    let safetyTimer = 0; // fallback if onRest never fires
     const DRAG_THRESHOLD = 8;
+
+    function armSafetyTimer() {
+      clearTimeout(safetyTimer);
+      safetyTimer = window.setTimeout(() => {
+        // Safety: if spring never settles, fire onSettled anyway
+        if (state.traveling) { state.traveling = false; onSettledStable.current?.(); }
+      }, 600);
+    }
 
     // Must be declared before the activeIndex check below calls it
     function ensureLoop() { if (!running) { running = true; lastTime = 0; raf = requestAnimationFrame(frame); } }
@@ -154,8 +170,9 @@ export function LiquidDock({
       state.currentActive = idx;
     }
 
-    // Hide lens until first measured paint — prevents flash at wrong position
-    lens.style.opacity = '0';
+    // Hide lens until first measured paint — prevents flash at wrong position.
+    // Mid-travel remounts keep the lens visible: it is already in position.
+    if (!state.traveling) lens.style.opacity = '0';
 
     if (!state.initialized) {
       snapTo(activeIndex);
@@ -169,8 +186,16 @@ export function LiquidDock({
       ensureLoop();
     }
 
+    // Selecting a tab navigates → this effect re-runs before the spring rests.
+    // Re-arm the settle contract so the panel still closes when it lands.
+    if (state.traveling) {
+      armSafetyTimer();
+      ensureLoop();
+    }
+
     // Deferred first paint: wait one rAF so layout is settled, then reveal lens
     const initRaf = requestAnimationFrame(() => {
+      if (state.traveling) return; // mid-flight — the frame loop owns the paint
       snapTo(state.currentActive);
       paintLens(); paintDot(); paintIcons();
       // Fade lens in after correct position is set
@@ -196,13 +221,13 @@ export function LiquidDock({
      *  Computed from known geometry — no DOM measurement needed. */
     function iconCrossCentre(): number {
       if (vert) {
-        // No labels in vertical mode, icon centred in BAR_THICKNESS
+        // Vertical: icon + label stack along the MAIN axis; on the cross
+        // axis (x) both are centred in BAR_THICKNESS.
         return BAR_THICKNESS / 2;
       }
       // Horizontal: icon + label + gap are centred in BAR_THICKNESS.
       // Label ~12px (10px font + line-height), gap 2px → stack ~40px.
       // Icon centre = BAR_THICKNESS/2 + (labelHeight + gap) / 2 from bottom.
-      const LABEL_BLOCK = 14; // label height + gap
       return BAR_THICKNESS / 2 + LABEL_BLOCK / 2;
     }
 
@@ -219,9 +244,10 @@ export function LiquidDock({
       const cc = iconCrossCentre();
 
       if (vert) {
-        // main=Y, cross=X
+        // main=Y, cross=X. Lens centres on the icon, which sits
+        // LABEL_BLOCK/2 above the slot centre (label stacked below it).
         const crossLeft = cc - cross / 2;
-        lens.style.top = `${s}px`;
+        lens.style.top = `${s - LABEL_BLOCK / 2}px`;
         lens.style.bottom = '';
         // Position relative to the bar's side
         if (side === 'right') {
@@ -249,10 +275,14 @@ export function LiquidDock({
     function paintDot() {
       const cx = slotCenter(state.currentActive);
       if (vert) {
-        dot.style.top = `${cx}px`;
-        dot.style.transform = 'translateY(-50%)';
-        dot.style.left = side === 'left' ? '6px' : '';
-        dot.style.right = side === 'right' ? '6px' : '';
+        // Mirror the horizontal layout exactly: the dot sits just BELOW the
+        // label, centred on the cross axis. Horizontal puts the dot centre at
+        // BAR_THICKNESS - 8 - DOT_SIZE/2 from the icon-stack top edge; reuse
+        // that same in-cell offset from the slot centre here.
+        dot.style.top = `${cx + BAR_THICKNESS / 2 - 8 - DOT_SIZE / 2}px`;
+        dot.style.left = `${BAR_THICKNESS / 2}px`;
+        dot.style.transform = 'translate(-50%, -50%)';
+        dot.style.right = '';
         dot.style.bottom = '';
       } else {
         dot.style.left = `${cx}px`;
@@ -283,35 +313,12 @@ export function LiquidDock({
         if (outline) outline.style.opacity = String(1 - fill);
         if (filled) filled.style.opacity = String(fill);
 
-        // Label (horizontal only) or tooltip trigger
         const label = el.querySelector<HTMLSpanElement>('[data-slot="label"]');
         if (label) {
           const op = 0.6 + 0.4 * fill;
           label.style.color = fill > 0.5 ? '#ffffff' : `rgba(255,255,255,${op})`;
           label.style.fontWeight = fill > 0.5 ? '600' : '400';
           label.style.textShadow = fill > 0.5 ? '0 0 8px rgba(255,255,255,0.3)' : 'none';
-        }
-      }
-
-      // Vertical tooltip
-      if (vert && tip) {
-        const idx = hoveredIdx >= 0 ? hoveredIdx : (pointerDown ? nearestSlot((s + e) / 2) : -1);
-        const tab = idx >= 0 ? tabs[idx] : null;
-        if (tab) {
-          const cy = slotCenter(idx);
-          tip.textContent = tab.label;
-          tip.style.opacity = '1';
-          tip.style.top = `${cy}px`;
-          tip.style.transform = 'translateY(-50%)';
-          if (side === 'right') {
-            tip.style.right = `${BAR_THICKNESS + 12}px`;
-            tip.style.left = '';
-          } else {
-            tip.style.left = `${BAR_THICKNESS + 12}px`;
-            tip.style.right = '';
-          }
-        } else if (tip) {
-          tip.style.opacity = '0';
         }
       }
     }
@@ -350,8 +357,8 @@ export function LiquidDock({
         state.start.x = state.start.target; state.end.x = state.end.target;
         state.start.v = 0; state.end.v = 0;
         // Fire onSettled when spring rests after a tab change
-        if (traveling) {
-          traveling = false;
+        if (state.traveling) {
+          state.traveling = false;
           clearTimeout(safetyTimer);
           // Brief pause so the lens sits for a beat before panel closes
           setTimeout(() => { onSettledStable.current?.(); }, 120);
@@ -417,21 +424,15 @@ export function LiquidDock({
         return;
       }
       // Tab change: start traveling, navigate immediately
-      traveling = true;
-      clearTimeout(safetyTimer);
-      safetyTimer = window.setTimeout(() => {
-        // Safety: if spring never settles, fire onSettled anyway
-        if (traveling) { traveling = false; onSettledStable.current?.(); }
-      }, 600);
+      state.traveling = true;
+      armSafetyTimer();
       setTarget(idx); state.currentActive = idx; hoveredIdx = idx; tryHaptic();
       onSelectStable.current?.(idx); ensureLoop();
       lens.style.transition = 'none'; lens.style.transform = '';
     };
 
     const onPointerLeave = () => {
-      if (!pointerDown) { hoveredIdx = -1; setTarget(state.currentActive); ensureLoop();
-        if (vert && tip) tip.style.opacity = '0';
-      }
+      if (!pointerDown) { hoveredIdx = -1; setTarget(state.currentActive); ensureLoop(); }
     };
     const onCtx = (e: Event) => e.preventDefault();
     const onResize = () => {
@@ -494,6 +495,7 @@ export function LiquidDock({
       <div
         ref={lensRef}
         aria-hidden="true"
+        data-slot="dock-lens"
         className="pointer-events-none absolute"
         style={{
           width: LENS_BASE, height: LENS_BASE,
@@ -512,24 +514,6 @@ export function LiquidDock({
           mixBlendMode: 'overlay',
         }} />
       </div>
-
-      {/* Vertical tooltip */}
-      {vert && (
-        <span
-          ref={tipRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute z-50 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold opacity-0"
-          style={{
-            background: opaque ? '#2c2c2e' : 'rgba(30,30,30,0.75)',
-            color: 'rgba(255,255,255,0.9)',
-            backdropFilter: opaque ? 'none' : 'blur(8px)',
-            WebkitBackdropFilter: opaque ? 'none' : 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            transition: 'opacity 150ms ease-out',
-          }}
-        />
-      )}
 
       {/* Glass bar */}
       <div
@@ -573,17 +557,18 @@ export function LiquidDock({
                   <Icon data-variant="filled" size={ICON_SIZE} strokeWidth={2.4} fill="currentColor"
                     style={{ position: 'absolute', inset: 0, color: '#ffffff', opacity: isActive ? 1 : 0, transition: 'none', pointerEvents: 'none' }} />
                 </div>
-                {/* Labels: horizontal only. Vertical uses side tooltip. */}
-                {!vert && (
-                  <span data-slot="label" style={{
-                    fontSize: 10, lineHeight: 1, fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
-                    textShadow: isActive ? '0 0 8px rgba(255,255,255,0.3)' : 'none',
-                    transition: 'none', whiteSpace: 'nowrap', pointerEvents: 'none', userSelect: 'none',
-                  }}>
-                    {tab.label}
-                  </span>
-                )}
+                <span data-slot="label" style={{
+                  fontSize: 10, lineHeight: 1, fontWeight: isActive ? 600 : 400,
+                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                  textShadow: isActive ? '0 0 8px rgba(255,255,255,0.3)' : 'none',
+                  transition: 'none', whiteSpace: 'nowrap', pointerEvents: 'none', userSelect: 'none',
+                  // Vertical slots are only BAR_THICKNESS wide (horizontal ones are
+                  // ~100px); clamp so a long label can't spill past the glass pill.
+                  // aria-label above always carries the full text.
+                  ...(vert ? { maxWidth: BAR_THICKNESS - 8, overflow: 'hidden', textOverflow: 'ellipsis' } : {}),
+                }}>
+                  {tab.label}
+                </span>
               </div>
             );
           })}

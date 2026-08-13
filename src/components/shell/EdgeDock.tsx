@@ -13,6 +13,11 @@ export type DockEdge = 'bottom' | 'left' | 'right';
 /* How close (px) the pointer must get to the collapsed hint before the dock opens. */
 const PROXIMITY = 12;
 
+/* Cross-edge coordination: only ONE edge dock may be open at a time (two open
+ * docks stack their scrims and double-darken the page). Opening one broadcasts
+ * this event; every other edge closes itself on receipt. */
+const DOCK_OPEN_EVENT = 'arsam:edge-dock-open';
+
 /** Only mouse/pen triggers proximity open — touch has its own tap path. */
 function isHoveringPointer(e: PointerEvent): boolean {
   return e.pointerType !== 'touch';
@@ -159,7 +164,17 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
 
   useEffect(() => {
     openRef.current = open;
-  }, [open]);
+    if (open) window.dispatchEvent(new CustomEvent<DockEdge>(DOCK_OPEN_EVENT, { detail: edge }));
+  }, [open, edge]);
+
+  // Close when a sibling edge dock opens (single-open rule, see DOCK_OPEN_EVENT).
+  useEffect(() => {
+    const onSiblingOpen = (e: Event) => {
+      if ((e as CustomEvent<DockEdge>).detail !== edge) setOpen(false);
+    };
+    window.addEventListener(DOCK_OPEN_EVENT, onSiblingOpen);
+    return () => window.removeEventListener(DOCK_OPEN_EVENT, onSiblingOpen);
+  }, [edge]);
 
   // Proximity open/close: open when the pointer approaches within PROXIMITY px of the
   // hint (or, while open, the revealed panel), and close when it moves beyond that zone —
