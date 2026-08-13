@@ -29,7 +29,7 @@ export function DockShell({ children, now }: DockShellProps) {
 
   return (
     <div className="flex min-h-svh flex-col overflow-x-hidden">
-      {/* Floating dock (xl+). */}
+      {/* Floating command dock — responsive host for all breakpoints. */}
       <CommandDock now={now} />
 
       {edgeBottom && <EdgeDock edge="bottom" />}

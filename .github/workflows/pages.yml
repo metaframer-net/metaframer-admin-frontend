@@ -15,10 +15,11 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time; do not cancel an in-flight publish.
+# One deploy at a time. Cancel any older queued/in-flight publish so a newer
+# push to main always wins and stale deploys never pile up behind the lock.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:

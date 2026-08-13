@@ -151,6 +151,49 @@ export const HoverLens: Story = {
 };
 
 /**
+ * Hovering a tile crossfades its icon from outline to filled as the lens overlap
+ * grows (regression guard for the icon fill contract, ported from the sibling
+ * branch's "Magnifies (icon crossfade)" story).
+ */
+export const HoverFillsPointedTile: Story = {
+  name: 'Hover fills pointed tile',
+  args: { edge: 'bottom' },
+  play: async () => {
+    const body = within(document.body);
+    await userEvent.click(body.getByRole('button', { name: /Gezinme dock.*aç/ }));
+    const tablist = body.getByRole('tablist', { name: 'Ana gezinme' });
+    const tabs = within(tablist).getAllByRole('tab');
+    const last = tabs[tabs.length - 1];
+    const filled = last?.querySelector<SVGElement>('[data-variant="filled"]');
+    const outline = last?.querySelector<SVGElement>('[data-variant="outline"]');
+    if (!(filled instanceof SVGElement) || !(outline instanceof SVGElement) || !last) {
+      throw new Error('dock tile icons did not render');
+    }
+
+    // Re-dispatch the hover on every poll — the rAF spring only reschedules
+    // while moving, and headless frame cadence is irregular (see HoverLens).
+    await waitFor(
+      () => {
+        const rect = last.getBoundingClientRect();
+        last.dispatchEvent(
+          new PointerEvent('pointermove', {
+            pointerType: 'mouse',
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+            bubbles: true,
+          }),
+        );
+        // The pointed tile is now showing its filled icon.
+        expect(parseFloat(filled.style.opacity)).toBeGreaterThan(0.9);
+      },
+      { timeout: 5000 },
+    );
+    // …and its outline has faded out in tandem.
+    await expect(parseFloat(outline.style.opacity)).toBeLessThan(0.1);
+  },
+};
+
+/**
  * The dock is permissions-driven and holds no async data, so it has no distinct
  * loading / empty / error surfaces — these stubs render the resting dock and exist only
  * for state-set parity with the sibling shell components (Storybook-first rule).

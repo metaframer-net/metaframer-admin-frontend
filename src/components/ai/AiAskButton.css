@@ -69,9 +69,18 @@
   display: inline-flex;
 }
 
-.ask-orb .ask-btn__icon svg {
+/* Icon = 50% of the orb. Size the ICON BOX to half the orb (its % resolves against
+   the full-size `.ask-btn__content`) and let the sparkle fill it. Sizing the SVG
+   with `50%` directly fails: that percentage resolves against the auto-sized icon
+   box (which shrinks to the SVG), not the orb — so the glyph collapses to ~20px. */
+.ask-orb .ask-btn__icon {
   width: 50%;
   height: 50%;
+}
+
+.ask-orb .ask-btn__icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .ask-btn:hover {
