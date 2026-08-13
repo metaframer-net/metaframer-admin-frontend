@@ -25,7 +25,7 @@ export const Interaction: Story = {
     const [current, next, confirm] = canvas.getAllByPlaceholderText('••••••••');
 
     // Mismatch blocks submit.
-    await userEvent.type(current!, 'arsam1234');
+    await userEvent.type(current!, 'example1234');
     await userEvent.type(next!, 'newStrong1');
     await userEvent.type(confirm!, 'different1');
     await userEvent.click(canvas.getByRole('button', { name: 'Şifreyi güncelle' }));
@@ -37,7 +37,7 @@ export const Interaction: Story = {
     await userEvent.type(confirm!, 'newStrong1');
     await userEvent.click(canvas.getByRole('button', { name: 'Şifreyi güncelle' }));
     await expect(args.onSubmit).toHaveBeenCalledWith({
-      currentPassword: 'arsam1234',
+      currentPassword: 'example1234',
       newPassword: 'newStrong1',
     });
   },

@@ -44,7 +44,7 @@ export function GeneralSettingsForm({ defaultValues, onSubmit, submitting }: Gen
             help="Panelde ve bildirimlerde görünen platform adı."
             required
           >
-            <Input placeholder="arsam.net" autoComplete="off" data-action="edit-field" data-entity="settings" />
+            <Input placeholder="example.net" autoComplete="off" data-action="edit-field" data-entity="settings" />
           </FormField>
 
           <FormField
@@ -56,7 +56,7 @@ export function GeneralSettingsForm({ defaultValues, onSubmit, submitting }: Gen
             <Input
               type="email"
               inputMode="email"
-              placeholder="destek@arsam.net"
+              placeholder="destek@example.net"
               autoComplete="off"
               data-action="edit-field"
               data-entity="settings"

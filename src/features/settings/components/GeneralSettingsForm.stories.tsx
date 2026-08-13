@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByLabelText(/Site adı/)).toHaveValue('arsam.net');
+    await expect(canvas.getByLabelText(/Site adı/)).toHaveValue('example.net');
     // Enabling maintenance mode is guarded by a confirm dialog, so the switch
     // must NOT flip on the first click (it waits for confirmation).
     const maintenance = canvas.getByRole('switch', { name: 'Bakım modu' });
@@ -40,7 +40,7 @@ export const Empty: Story = {
 
 // Error — a submit with an invalid email surfaces the field-level error.
 export const Error: Story = {
-  args: { defaultValues: { siteName: 'arsam.net', supportEmail: 'gecersiz', defaultLocale: 'tr', maintenanceMode: false } },
+  args: { defaultValues: { siteName: 'example.net', supportEmail: 'gecersiz', defaultLocale: 'tr', maintenanceMode: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Kaydet' }));

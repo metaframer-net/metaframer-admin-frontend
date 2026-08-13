@@ -31,7 +31,7 @@ export const Default: Story = {
     // reduced motion.
     await expect(logo).toHaveClass('animate-pulse-strong');
     await expect(logo).toHaveClass('motion-reduce:animate-none');
-    // Decorative — the adjacent "arsam" label carries the accessible name.
+    // Decorative — the adjacent "example" label carries the accessible name.
     await expect(logo).toHaveAttribute('aria-hidden', 'true');
   },
 };

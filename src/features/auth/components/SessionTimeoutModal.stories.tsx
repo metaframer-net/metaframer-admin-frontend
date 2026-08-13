@@ -22,9 +22,9 @@ export const Mobile: Story = { parameters: { viewport: { defaultViewport: 'mobil
 export const Interaction: Story = {
   play: async ({ args }) => {
     const body = within(document.body);
-    await userEvent.type(body.getByLabelText('Şifre'), 'arsam1234');
+    await userEvent.type(body.getByLabelText('Şifre'), 'example1234');
     await userEvent.click(body.getByRole('button', { name: 'Kilidi aç' }));
-    await expect(args.onReauth).toHaveBeenCalledWith('arsam1234');
+    await expect(args.onReauth).toHaveBeenCalledWith('example1234');
 
     await userEvent.click(body.getByRole('button', { name: 'Çıkış yap' }));
     await expect(args.onLogout).toHaveBeenCalled();

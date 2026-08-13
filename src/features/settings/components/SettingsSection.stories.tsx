@@ -10,7 +10,7 @@ const meta = {
   args: {
     title: 'Genel / Sistem',
     description: 'Platform kimliği ve sistem düzeyi ayarlar.',
-    children: <Input placeholder="arsam.net" aria-label="Örnek alan" />,
+    children: <Input placeholder="example.net" aria-label="Örnek alan" />,
   },
 } satisfies Meta<typeof SettingsSection>;
 

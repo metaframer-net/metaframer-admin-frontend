@@ -7,7 +7,7 @@ export interface DockLogoProps {
 }
 
 /**
- * The round Arsam launcher logo shown in `dock` mode — the liquid-glass AI orb
+ * The round Example launcher logo shown in `dock` mode — the liquid-glass AI orb
  * ({@link AiOrb}), icon-only (no label). The sparkle sits centered at 50% of the
  * box; on top of the animated dot field it carries a continuous heartbeat (lub-dub)
  * pulse (`animate-pulse-strong`, scale 1 → 1.22). Nothing on the path up to the dock

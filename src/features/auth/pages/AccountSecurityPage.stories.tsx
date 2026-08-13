@@ -23,7 +23,7 @@ type Story = StoryObj<typeof meta>;
 const SESSIONS: SecurityInfo['sessions'] = [
   { id: 'current', device: 'Bu tarayıcı', location: 'İstanbul, TR', lastActive: 'Şu anda aktif', current: true },
   { id: 'sess-chrome-win', device: 'Chrome · Windows', location: 'Ankara, TR', lastActive: 'Bugün 09:12', current: false },
-  { id: 'sess-ios-app', device: 'arsam iOS uygulaması', location: 'İzmir, TR', lastActive: '2 gün önce', current: false },
+  { id: 'sess-ios-app', device: 'example iOS uygulaması', location: 'İzmir, TR', lastActive: '2 gün önce', current: false },
 ];
 
 function renderWith(seed: (qc: QueryClient) => void) {

@@ -16,7 +16,7 @@ function Probe() {
 const USER: SessionUser = {
   id: 'u-1',
   name: 'Ahmet Yönetici',
-  email: 'super@arsam.net',
+  email: 'super@example.net',
   role: 'super-admin',
 };
 
@@ -38,7 +38,7 @@ describe('AuthProvider', () => {
   it('restores the session from a persisted token via GET /auth/me', async () => {
     // moderator has no 2FA, so login returns a session token directly.
     const res = await api.post<LoginResponse>('/auth/login', {
-      email: 'moderator@arsam.net',
+      email: 'moderator@example.net',
       password: DEMO_PASSWORD,
     });
     setAuthToken(res.token!);
@@ -48,7 +48,7 @@ describe('AuthProvider', () => {
       </AuthProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId('probe')).toHaveTextContent('authenticated:moderator@arsam.net'),
+      expect(screen.getByTestId('probe')).toHaveTextContent('authenticated:moderator@example.net'),
     );
   });
 
@@ -58,7 +58,7 @@ describe('AuthProvider', () => {
         <Probe />
       </AuthProvider>,
     );
-    expect(screen.getByTestId('probe')).toHaveTextContent('authenticated:super@arsam.net');
+    expect(screen.getByTestId('probe')).toHaveTextContent('authenticated:super@example.net');
     act(() => emitUnauthorized());
     expect(screen.getByTestId('probe')).toHaveTextContent('unauthenticated:-');
   });

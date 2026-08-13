@@ -510,7 +510,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
               type="button"
               onClick={() => setOpen(!open)}
               className="hover:bg-glass-foreground/10 inline-flex min-h-14 min-w-0 items-center gap-1.5 self-stretch rounded-full pl-0 pr-2.5 text-sm font-medium outline-none transition-[background-color,scale] duration-[var(--duration-fast)] active:scale-[0.97] motion-reduce:active:scale-100"
-              aria-label={`arsam.net · Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
+              aria-label={`example.net · Şu an: ${trail.length > 0 ? trail.join(' › ') : activeLabel}, saat ${time} — menü ve komut aramayı aç`}
               aria-keyshortcuts="Meta+K Control+K"
               aria-haspopup="dialog"
               aria-expanded={panelOpen}
@@ -525,7 +525,7 @@ export function CommandDock({ now, className }: CommandDockProps) {
                   ⌘K stay desktop-only so the mobile pill never crams. The accessible
                   NAME (below) carries the full "Şu an: … saat …" reading regardless. */}
               <span className="hidden shrink-0 font-semibold tracking-tight xl:inline">
-                arsam.net
+                example.net
               </span>
               {/* Desktop: brand-led resting pill; the verbose status (page · clock ·
                   ⌘K) springs out of the `.dock-reveal` on hover/focus. Wrapped in a

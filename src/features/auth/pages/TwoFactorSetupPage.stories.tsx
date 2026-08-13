@@ -15,7 +15,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const SETUP = { secret: 'ARSAMDEMOSECRET234', otpauth: 'otpauth://totp/arsam.net?secret=ARSAMDEMOSECRET234&issuer=arsam.net' };
+const SETUP = { secret: 'EXAMPLEDEMOSECRET234', otpauth: 'otpauth://totp/example.net?secret=EXAMPLEDEMOSECRET234&issuer=example.net' };
 
 function renderWith(withState: boolean) {
   const client: QueryClient = makeSeededClient((qc) =>

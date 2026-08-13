@@ -23,14 +23,14 @@ export const Mobile: Story = { parameters: { viewport: { defaultViewport: 'mobil
 /** Invalid email blocks submit; a valid one calls onSubmit. */
 export const Interaction: Story = {
   play: async ({ canvas, args }) => {
-    const email = canvas.getByPlaceholderText('ad.soyad@arsam.net');
+    const email = canvas.getByPlaceholderText('ad.soyad@example.net');
     await userEvent.type(email, 'not-an-email');
     await userEvent.click(canvas.getByRole('button', { name: 'Sıfırlama bağlantısı gönder' }));
     await expect(await canvas.findByText('Geçerli bir e-posta adresi girin.')).toBeInTheDocument();
     await expect(args.onSubmit).not.toHaveBeenCalled();
 
     await userEvent.clear(email);
-    await userEvent.type(email, 'moderator@arsam.net');
+    await userEvent.type(email, 'moderator@example.net');
     await userEvent.click(canvas.getByRole('button', { name: 'Sıfırlama bağlantısı gönder' }));
     await expect(args.onSubmit).toHaveBeenCalled();
   },

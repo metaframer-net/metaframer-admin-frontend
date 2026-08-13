@@ -7,12 +7,12 @@ import { makeSeededClient } from '@/features/listings/pages/page-story-utils';
 import { orgKeys } from '../api/hooks';
 import { OrgSwitcher } from './OrgSwitcher';
 
-const USER: SessionUser = { id: 'u-1', name: 'Ahmet Yönetici', email: 'super@arsam.net', role: 'super-admin' };
+const USER: SessionUser = { id: 'u-1', name: 'Ahmet Yönetici', email: 'super@example.net', role: 'super-admin' };
 const ORGS = {
   organizations: [
-    { id: 'org-main', name: 'arsam.net' },
-    { id: 'org-corp', name: 'arsam Kurumsal' },
-    { id: 'org-ege', name: 'arsam Ege Bölge' },
+    { id: 'org-main', name: 'example.net' },
+    { id: 'org-corp', name: 'Example Kurumsal' },
+    { id: 'org-ege', name: 'Example Ege Bölge' },
   ],
   activeOrgId: 'org-main',
 };
@@ -48,7 +48,7 @@ export const Interaction: Story = {
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByRole('button', { name: /Organizasyon/ }));
     const menu = await within(document.body).findByRole('menu');
-    await expect(within(menu).getByText('arsam Ege Bölge')).toBeInTheDocument();
+    await expect(within(menu).getByText('Example Ege Bölge')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
   },
 };

@@ -28,7 +28,7 @@ export const Default: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Ayarlar' })).toBeInTheDocument();
     // General tab is default: site name field is present.
-    await expect(canvas.getByLabelText(/Site adı/)).toHaveValue('arsam.net');
+    await expect(canvas.getByLabelText(/Site adı/)).toHaveValue('example.net');
     // Switch to the feature-flags tab and assert a flag switch renders.
     await userEvent.click(canvas.getByRole('tab', { name: 'Özellik Bayrakları' }));
     await expect(await canvas.findByRole('switch', { name: 'İlan detayında harita' })).toBeChecked();

@@ -19,7 +19,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const INVITE: InviteDetails = { email: 'yeni.admin@arsam.net', name: 'Yeni Yönetici', role: 'moderator' };
+const INVITE: InviteDetails = { email: 'yeni.admin@example.net', name: 'Yeni Yönetici', role: 'moderator' };
 const KEY = ['auth', 'invite', 'invite-demo'] as const;
 
 function renderWith(seed: (qc: QueryClient) => void) {

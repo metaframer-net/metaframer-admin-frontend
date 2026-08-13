@@ -34,7 +34,7 @@ export function AuthShell({ title, subtitle, children, footer }: AuthShellProps)
           <div className="mb-5 flex items-center gap-2.5">
             <BrandMark />
             <div className="leading-tight">
-              <div className="font-semibold tracking-tight">arsam.net</div>
+              <div className="font-semibold tracking-tight">example.net</div>
               <div className="text-muted-foreground text-xs">Yönetim Paneli</div>
             </div>
           </div>

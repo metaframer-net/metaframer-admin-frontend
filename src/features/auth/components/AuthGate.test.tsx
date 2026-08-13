@@ -11,7 +11,7 @@ afterEach(() => clearSessionExpired());
 const USER: SessionUser = {
   id: 'u-1',
   name: 'Ahmet Yönetici',
-  email: 'super@arsam.net',
+  email: 'super@example.net',
   role: 'super-admin',
 };
 
