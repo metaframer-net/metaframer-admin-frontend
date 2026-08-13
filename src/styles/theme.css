@@ -283,11 +283,11 @@
      reference dock's "living" launcher). prefers-reduced-motion users are fully
      protected (base layer collapses it to a single ~0ms cycle ending at scale(1), plus
      an explicit motion-reduce:animate-none on the element). */
-  --animate-pulse-soft: pulse-soft 1.8s var(--ease-in-out) infinite;
+  --animate-pulse-soft: pulse-soft 3.6s var(--ease-in-out) infinite;
   /* Stronger heartbeat for the dock AI orb — a more pronounced lub-dub whose peak
      grows well past the enclosing gray brand surface. Same reduced-motion
      protection as pulse-soft (base-layer collapse + motion-reduce:animate-none). */
-  --animate-pulse-strong: pulse-strong 1.8s var(--ease-in-out) infinite;
+  --animate-pulse-strong: pulse-strong 3.6s var(--ease-in-out) infinite;
 
   /* Live indicator halo — a dot expands and fades to mark "this reading is live"
      (the dock status chip's clock). Decorative: the element carrying it is
@@ -361,34 +361,41 @@
     transform: scale(1);
   }
 }
-/* Heartbeat (lub-dub) — a strong beat, a lighter second beat, then rest. Starts AND
-   ends at scale(1) so a reduced-motion single cycle leaves no residual transform. */
+/* Heartbeat (lub-dub) — a strong beat then a lighter second beat, easing back to
+   rest across the whole cycle with NO hold: the beat fades and the next cycle
+   begins immediately (continuous, no idle pause). Starts AND ends at scale(1) so a
+   reduced-motion single cycle leaves no residual transform. */
 @keyframes pulse-soft {
   0%,
-  40%,
   100% {
     transform: scale(1);
   }
-  12% {
+  16% {
     transform: scale(1.12);
   }
-  26% {
-    transform: scale(1.04);
+  32% {
+    transform: scale(1.02);
+  }
+  48% {
+    transform: scale(1.05);
   }
 }
 /* Stronger lub-dub for the dock AI orb — bigger peak so the beat visibly pushes
-   past the gray brand surface. Starts AND ends at scale(1) (reduced-motion safe). */
+   past the gray brand surface. Same continuous, no-hold shape as pulse-soft.
+   Starts AND ends at scale(1) (reduced-motion safe). */
 @keyframes pulse-strong {
   0%,
-  40%,
   100% {
     transform: scale(1);
   }
-  12% {
+  16% {
     transform: scale(1.22);
   }
-  26% {
-    transform: scale(1.08);
+  32% {
+    transform: scale(1.04);
+  }
+  48% {
+    transform: scale(1.1);
   }
 }
 /* Live halo — the ring grows past the core and fades out, then rests. */
@@ -490,6 +497,13 @@
     width: var(--dock-w-engaged);
   }
 
+  /* Held engaged while the bell popover / user menu is open (see CommandDock):
+     their content portals out of the dock, so `:hover`/`:focus-within` no longer
+     match — this keeps the pill from collapsing under the open menu. */
+  .dock-pill[data-hold='true'] {
+    width: var(--dock-w-engaged);
+  }
+
   .dock-pill[data-open='true'],
   .dock-pill[data-open='true']:hover,
   .dock-pill[data-open='true']:focus-within {
@@ -561,6 +575,14 @@
   }
 
   .dock-pill:focus-within .dock-reveal {
+    grid-template-columns: 1fr;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Same reveal, held open while the bell/user menu is open (matches the engaged
+     stage so the pill stays whole under the open menu). */
+  .dock-pill[data-hold='true'] .dock-reveal {
     grid-template-columns: 1fr;
     opacity: 1;
     pointer-events: auto;

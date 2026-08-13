@@ -362,9 +362,6 @@ export function CommandCenter({ onClose, contextEntity, className }: CommandCent
             reads the same as a pinned footer. */}
         {suggestions.length > 0 && (
           <div className="border-border/60 bg-background/40 border-t px-3 py-3">
-            <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[0.6875rem] font-medium">
-              <Sparkles className="text-primary size-3" aria-hidden /> Senin için öneriler
-            </div>
             {/* Mobile: ALWAYS 2×2 (2 side-by-side, 2 below). Labels wrap to two lines
                 rather than truncate, so they stay readable even at 320px. Desktop: a
                 single wrapping row of capsules. */}

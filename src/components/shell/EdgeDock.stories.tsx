@@ -248,18 +248,19 @@ export const NoOverflow: Story = {
 };
 
 /**
- * Phone width — successor of the old "MobileHidden" story. The edge dock now serves
- * mobile too (dock layout is desktop AND mobile; the hint tab is a 44px touch
- * target), so at a phone width the hint must render VISIBLE and a tap must open
- * the dock.
+ * Mobile — the edge dock is shown on phones too (dock layout, desktop AND mobile;
+ * the hint tab is a 44px touch target), so its navigation is available alongside
+ * the command pill. It renders visible (not `display: none`) at a phone width,
+ * and a tap on the collapsed hint must open the dock.
  */
-export const MobileHint: Story = {
+export const MobileVisible: Story = {
   args: { edge: 'bottom' },
   parameters: { viewport: { defaultViewport: 'bpXs' } },
   play: async () => {
     const dock = document.body.querySelector('[data-slot="edge-dock"]');
     if (!(dock instanceof HTMLElement)) throw new Error('edge dock did not render');
     await expect(getComputedStyle(dock).display).not.toBe('none');
+    // Its collapsed hint is a reachable toggle at phone width — and a tap opens it.
     const hint = within(document.body).getByRole('button', { name: /Gezinme dock.*aç/ });
     await userEvent.click(hint);
     await expect(hint).toHaveAttribute('aria-expanded', 'true');

@@ -50,10 +50,13 @@ export const Mobile: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   play: async ({ canvas }) => {
-    // The drawer trigger is the mobile navigation affordance.
+    // Convergence below xl: navigation is reached through the top bar's mobile
+    // drawer trigger.
     await expect(canvas.getByRole('button', { name: 'Menüyü aç' })).toBeInTheDocument();
-    // The persistent sidebar nav is display:none below xl → absent from the a11y tree.
+    // The persistent sidebar nav is display:none below xl → absent from the a11y
+    // tree — and the old always-open bottom nav (a tablist) stays removed.
     await expect(canvas.queryByRole('navigation', { name: 'Ana gezinme' })).toBeNull();
+    await expect(canvas.queryByRole('tablist', { name: 'Ana gezinme' })).toBeNull();
   },
 };
 
@@ -85,7 +88,8 @@ export const DockMobile: Story = {
     await expect(canvas.queryByRole('navigation', { name: 'Alt gezinme' })).toBeNull();
     // The floating command pill's launcher carries navigation.
     await expect(canvas.getByRole('button', { name: /menü ve komut aramayı aç/i })).toBeInTheDocument();
-    // The flag-gated edge docks rest as collapsed hint tabs — reachable on mobile too.
+    // Edge nav docks are shown on mobile too (dock layout, desktop AND mobile), so
+    // their collapsed hint toggles are reachable alongside the command pill.
     await expect(canvas.getAllByRole('button', { name: /Gezinme dock.*aç/ }).length).toBeGreaterThan(0);
   },
 };
@@ -108,20 +112,22 @@ export const DockFlagOff: Story = {
 };
 
 /**
- * Tablet portrait (768px). Under the 8-token scale (task 019) the shell converges
- * to drawer + command palette BELOW `xl` (1024) — so at 768 the drawer trigger is
- * the active navigation affordance and the persistent sidebar is still CSS-hidden
- * (`display:none`, out of the a11y tree). The viewport IS applied in the test
- * runner, so role queries (which exclude `display:none`) prove convergence at the
- * real 768px width.
+ * Tablet portrait (768px). The shell converges to the drawer trigger BELOW `xl`
+ * (1024) — so at 768 the persistent sidebar is still CSS-hidden (`display:none`,
+ * out of the a11y tree) and the top bar's mobile drawer trigger carries navigation.
+ * The viewport IS applied in the test runner, so `getByRole` (which excludes
+ * `display:none`) proves convergence at the real 768px width.
  */
 export const Tablet: Story = {
   globals: { layout: 'sidebar' },
   parameters: { viewport: { defaultViewport: 'bpLg' } },
   play: async ({ canvas }) => {
-    // Drawer trigger is visible at 768 (convergence still active below xl).
-    const trigger = canvas.getByRole('button', { name: 'Menüyü aç' });
-    await expect(trigger.className).toContain('xl:hidden');
+    // Convergence still active below xl: the mobile drawer trigger (itself or its
+    // wrapper `xl:hidden`) is reachable at 768, and there is no bottom tablist.
+    const drawer = canvas.getByRole('button', { name: 'Menüyü aç' });
+    await expect(drawer).toBeInTheDocument();
+    await expect(drawer.closest('.xl\\:hidden')).not.toBeNull();
+    await expect(canvas.queryByRole('tablist', { name: 'Ana gezinme' })).toBeNull();
     // The sidebar exists in the DOM but its reveal is gated at `xl:flex` (1024), NOT `lg` (768).
     await expect(canvas.getByTestId('sidebar').className).toContain('xl:flex');
   },

@@ -26,11 +26,23 @@ const KIND_ICON: Record<NotificationItem['kind'], LucideIcon> = {
  * Notification center: bell + count badge. Desktop: Popover dropdown.
  * Mobile (below sm): bottom Sheet for proper touch UX.
  */
-export function NotificationBell({ className }: { className?: string }) {
+export function NotificationBell({
+  className,
+  onOpenChange,
+}: {
+  className?: string;
+  /** Notifies the host when the popover/sheet opens/closes (the dock keeps itself
+      engaged while it is open, since the content portals out of the dock DOM). */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useNotifications();
   const isDesktop = useMediaQuery('(min-width: 640px)');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const setSheet = (open: boolean) => {
+    setSheetOpen(open);
+    onOpenChange?.(open);
+  };
   const unread = data?.unread ?? 0;
   const items = data?.items ?? [];
 
@@ -84,7 +96,7 @@ export function NotificationBell({ className }: { className?: string }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setSheetOpen(false);
+                    setSheet(false);
                     navigate(item.to);
                   }}
                   className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2"
@@ -121,8 +133,8 @@ export function NotificationBell({ className }: { className?: string }) {
   if (!isDesktop) {
     return (
       <>
-        <span onClick={() => setSheetOpen(true)}>{bellButton}</span>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <span onClick={() => setSheet(true)}>{bellButton}</span>
+        <Sheet open={sheetOpen} onOpenChange={setSheet}>
           <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-safe">
             <SheetHeader className="px-4 pb-2">
               {/* Count sits in a badge NEXT TO the title (left group), so it never
@@ -145,7 +157,7 @@ export function NotificationBell({ className }: { className?: string }) {
 
   // Desktop: Popover
   return (
-    <Popover>
+    <Popover onOpenChange={(open) => onOpenChange?.(open)}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

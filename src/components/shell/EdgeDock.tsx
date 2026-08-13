@@ -4,9 +4,9 @@ import { Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { LiquidDock, LiquidDockFilters, type DockTab } from '@/components/liquid-dock';
-import { Scrim } from '@/components/ui/scrim';
 import { usePrimaryNav, isNavItemActive } from './nav-utils';
 import { useCommandPalette } from './command-palette-context';
+import { useEdgeDockScrim } from './edge-dock-scrim';
 
 export type DockEdge = 'bottom' | 'left' | 'right';
 
@@ -162,6 +162,11 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
   const nearRef = useRef(false);
   const stageId = `edge-dock-stage-${edge}`;
 
+  // Shared scrim: report this ear's open state up, and close when the shared scrim
+  // (or another ear's close-all) fires. One backdrop covers all ears, so the page
+  // never darkens more than once no matter how many are open.
+  const { reportOpen, closeToken } = useEdgeDockScrim();
+
   useEffect(() => {
     openRef.current = open;
     if (open) window.dispatchEvent(new CustomEvent<DockEdge>(DOCK_OPEN_EVENT, { detail: edge }));
@@ -175,6 +180,19 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
     window.addEventListener(DOCK_OPEN_EVENT, onSiblingOpen);
     return () => window.removeEventListener(DOCK_OPEN_EVENT, onSiblingOpen);
   }, [edge]);
+
+  useEffect(() => {
+    reportOpen(edge, open);
+  }, [edge, open, reportOpen]);
+
+  // Clear this ear from the shared "any open" set if it unmounts (flag turned off).
+  useEffect(() => () => reportOpen(edge, false), [edge, reportOpen]);
+
+  // A tap on the shared scrim bumps the token; close in response (skip the initial 0).
+  const firstCloseToken = useRef(closeToken);
+  useEffect(() => {
+    if (closeToken !== firstCloseToken.current) setOpen(false);
+  }, [closeToken]);
 
   // Proximity open/close: open when the pointer approaches within PROXIMITY px of the
   // hint (or, while open, the revealed panel), and close when it moves beyond that zone —
@@ -212,17 +230,7 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
   };
 
   return (
-    <>
-    {/* Scrim — 1s fade-in, 280ms fade-out */}
-    <Scrim
-      open={open}
-      onClick={() => setOpen(false)}
-      openDuration={1000}
-      openEasing="cubic-bezier(0.22, 0.61, 0.36, 1)"
-      closeDuration={280}
-      closeEasing="cubic-bezier(0.4, 0, 1, 1)"
-      zIndex={25}
-    />
+    // The backdrop lives in EdgeDockScrimProvider (one shared scrim for all ears).
     <div
       ref={wrapperRef}
       className={cn('fixed z-30', cfg.wrapper)}
@@ -266,7 +274,13 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
           aria-hidden="true"
           style={{ animationDelay: cfg.pulseDelay }}
           className={cn(
-            'bg-glass-foreground/40 group-hover:bg-glass-foreground/60 transition-opacity',
+            // Soft frosted LIGHT sliver: a low-opacity (/55) foreground fill over a
+            // STRONG backdrop blur. Occlusion comes from the blur — text under the
+            // collapsed hint smears into an unreadable frost — so we avoid both the
+            // old bleed (`bg-glass-foreground/40`, no blur) and the stark near-white
+            // slab that full opacity produced on the dark UI. The pulse is a `scale`
+            // beat, so the frosting is unaffected by it.
+            'bg-glass-foreground/55 group-hover:bg-glass-foreground/70 backdrop-blur-xl transition-colors',
             cfg.hintBar,
             cfg.origin, // pulse puffs inward from the edge, not half off-screen
             open ? 'opacity-0' : 'animate-pulse-soft opacity-100 motion-reduce:animate-none',
@@ -290,6 +304,5 @@ export function EdgeDock({ edge }: { edge: DockEdge }) {
         <LiquidEdgeStage edge={edge} onNavigate={() => setOpen(false)} />
       </div>
     </div>
-    </>
   );
 }
