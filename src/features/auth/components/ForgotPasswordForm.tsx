@@ -44,7 +44,7 @@ export function ForgotPasswordForm({ onSubmit, pending = false, errorMessage }: 
             type="email"
             autoComplete="username"
             autoFocus
-            placeholder="ad.soyad@arsam.net"
+            placeholder="ad.soyad@example.net"
             disabled={pending}
             data-action="fill-email"
             data-entity="auth"

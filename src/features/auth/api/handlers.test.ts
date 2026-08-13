@@ -19,27 +19,27 @@ async function login(email: string, password = DEMO_PASSWORD) {
 
 describe('auth handlers — sign in', () => {
   it('logs in a non-2FA account and returns a token + user', async () => {
-    const res = await login('moderator@arsam.net');
+    const res = await login('moderator@example.net');
     expect(res.token).toMatch(/^mock-/);
     expect(res.user?.role).toBe('moderator');
     expect(getAuditFor(`user:${res.user?.id}`).some((e) => e.action === 'auth.login')).toBe(true);
   });
 
   it('returns a 2FA challenge (no token) for a 2FA-enabled account', async () => {
-    const res = await login('super@arsam.net');
+    const res = await login('super@example.net');
     expect(res.requires2fa).toBe(true);
     expect(res.challengeToken).toMatch(/^chal-/);
     expect(res.token).toBeUndefined();
   });
 
   it('rejects wrong credentials with 401 and audits the failure', async () => {
-    const err = await login('moderator@arsam.net', 'wrong').catch((e: unknown) => e);
+    const err = await login('moderator@example.net', 'wrong').catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(401);
-    expect(getAuditFor('user:moderator@arsam.net').some((e) => e.action === 'auth.login_failed')).toBe(true);
+    expect(getAuditFor('user:moderator@example.net').some((e) => e.action === 'auth.login_failed')).toBe(true);
   });
 
   it('rejects an unknown email with 401', async () => {
-    const err = await login('nobody@arsam.net').catch((e: unknown) => e);
+    const err = await login('nobody@example.net').catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(401);
   });
 
@@ -51,7 +51,7 @@ describe('auth handlers — sign in', () => {
 
 describe('auth handlers — 2FA', () => {
   it('verifies the correct code and issues a session', async () => {
-    const challenge = await login('super@arsam.net');
+    const challenge = await login('super@example.net');
     const res = await api.post<LoginResponse>('/auth/2fa/verify', {
       challengeToken: challenge.challengeToken,
       code: DEMO_TOTP_CODE,
@@ -61,7 +61,7 @@ describe('auth handlers — 2FA', () => {
   });
 
   it('rejects a wrong code with 401', async () => {
-    const challenge = await login('super@arsam.net');
+    const challenge = await login('super@example.net');
     const err = await api
       .post<LoginResponse>('/auth/2fa/verify', { challengeToken: challenge.challengeToken, code: '000000' })
       .catch((e: unknown) => e);
@@ -78,7 +78,7 @@ describe('auth handlers — 2FA', () => {
 
 describe('auth handlers — session', () => {
   it('GET /auth/me returns the user for a valid token', async () => {
-    const res = await login('moderator@arsam.net');
+    const res = await login('moderator@example.net');
     setAuthToken(res.token!);
     const me = await api.get<SessionUser>('/auth/me');
     expect(me.role).toBe('moderator');
@@ -90,7 +90,7 @@ describe('auth handlers — session', () => {
   });
 
   it('logout invalidates the token and audits it', async () => {
-    const res = await login('support@arsam.net');
+    const res = await login('support@example.net');
     setAuthToken(res.token!);
     await api.post<void>('/auth/logout');
     expect(getAuditFor(`user:${res.user?.id}`).some((e) => e.action === 'auth.logout')).toBe(true);
@@ -102,7 +102,7 @@ describe('auth handlers — session', () => {
 describe('auth handlers — password recovery', () => {
   it('forgot-password returns a reset token for a known email', async () => {
     const res = await api.post<{ sent: boolean; resetToken?: string }>('/auth/forgot-password', {
-      email: 'moderator@arsam.net',
+      email: 'moderator@example.net',
     });
     expect(res.sent).toBe(true);
     expect(res.resetToken).toMatch(/^reset-/);
@@ -110,7 +110,7 @@ describe('auth handlers — password recovery', () => {
 
   it('forgot-password does not reveal an unknown email (no token, still sent)', async () => {
     const res = await api.post<{ sent: boolean; resetToken?: string }>('/auth/forgot-password', {
-      email: 'ghost@arsam.net',
+      email: 'ghost@example.net',
     });
     expect(res.sent).toBe(true);
     expect(res.resetToken).toBeUndefined();
@@ -119,17 +119,17 @@ describe('auth handlers — password recovery', () => {
   it('reset-password sets a new password that then works for login', async () => {
     // support has no 2FA requirement, so a successful login yields a token directly.
     const forgot = await api.post<{ resetToken?: string }>('/auth/forgot-password', {
-      email: 'support@arsam.net',
+      email: 'support@example.net',
     });
     await api.post<{ ok: boolean }>('/auth/reset-password', {
       token: forgot.resetToken,
       password: 'brandNew123',
     });
     // Old password no longer works…
-    const oldErr = await login('support@arsam.net').catch((e: unknown) => e);
+    const oldErr = await login('support@example.net').catch((e: unknown) => e);
     expect((oldErr as ApiError).status).toBe(401);
     // …the new one does.
-    const res = await login('support@arsam.net', 'brandNew123');
+    const res = await login('support@example.net', 'brandNew123');
     expect(res.token).toMatch(/^mock-/);
   });
 
@@ -144,7 +144,7 @@ describe('auth handlers — password recovery', () => {
 describe('auth handlers — invite', () => {
   it('resolves a valid invite token', async () => {
     const details = await api.get<InviteDetails>('/auth/invite?token=invite-demo');
-    expect(details.email).toBe('yeni.admin@arsam.net');
+    expect(details.email).toBe('yeni.admin@example.net');
     expect(details.role).toBe('moderator');
   });
 
@@ -159,7 +159,7 @@ describe('auth handlers — invite', () => {
       password: 'freshPass123',
     });
     expect(res.token).toMatch(/^mock-/);
-    expect(res.user?.email).toBe('yeni.admin@arsam.net');
+    expect(res.user?.email).toBe('yeni.admin@example.net');
     setAuthToken(res.token!);
     const me = await api.get<SessionUser>('/auth/me');
     expect(me.role).toBe('moderator');
@@ -174,7 +174,7 @@ describe('auth handlers — invite', () => {
 describe('auth handlers — account security', () => {
   /** Sign in a non-2FA admin and attach the token for subsequent calls. */
   async function authed() {
-    const res = await login('moderator@arsam.net');
+    const res = await login('moderator@example.net');
     setAuthToken(res.token!);
     return res;
   }
@@ -201,7 +201,7 @@ describe('auth handlers — account security', () => {
 
     await api.post('/auth/change-password', { currentPassword: DEMO_PASSWORD, newPassword: 'newPass123' });
     // New password now works for login.
-    const relog = await login('moderator@arsam.net', 'newPass123');
+    const relog = await login('moderator@example.net', 'newPass123');
     expect(relog.token).toMatch(/^mock-/);
   });
 
@@ -214,7 +214,7 @@ describe('auth handlers — account security', () => {
     const info = await api.get<SecurityInfo>('/auth/security');
     expect(info.totpEnabled).toBe(true);
     // Login now returns a challenge instead of a session.
-    const relog = await login('moderator@arsam.net');
+    const relog = await login('moderator@example.net');
     expect(relog.requires2fa).toBe(true);
   });
 
@@ -264,7 +264,7 @@ describe('auth handlers — account security', () => {
 describe('auth handlers — 2FA policy & enrollment (035)', () => {
   it('forces enrollment at login for a required role, then issues a session + recovery codes', async () => {
     // finance is required by policy but not enrolled in the seed.
-    const res = await login('finance@arsam.net');
+    const res = await login('finance@example.net');
     expect(res.requires2faSetup).toBe(true);
     expect(res.setupToken).toMatch(/^setup-/);
     const done = await api.post<LoginResponse & { recoveryCodes: string[] }>('/auth/2fa/setup-complete', {
@@ -276,7 +276,7 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
   });
 
   it('setup-complete rejects a wrong code (401)', async () => {
-    const res = await login('finance@arsam.net');
+    const res = await login('finance@example.net');
     const err = await api
       .post('/auth/2fa/setup-complete', { setupToken: res.setupToken, code: '000000' })
       .catch((e: unknown) => e);
@@ -285,14 +285,14 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
 
   it('accepts a recovery code at the 2FA step (single use)', async () => {
     // Enrol moderator, capture recovery codes.
-    const first = await login('moderator@arsam.net');
+    const first = await login('moderator@example.net');
     setAuthToken(first.token!);
     const enable = await api.post<{ codes: string[] }>('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
     const recovery = enable.codes[0]!;
     clearAuthToken();
 
     // Login again → challenge; verify with the recovery code.
-    const chal = await login('moderator@arsam.net');
+    const chal = await login('moderator@example.net');
     expect(chal.requires2fa).toBe(true);
     const done = await api.post<LoginResponse>('/auth/2fa/verify', {
       challengeToken: chal.challengeToken,
@@ -301,7 +301,7 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
     expect(done.token).toMatch(/^mock-/);
 
     // Reusing the same recovery code fails.
-    const chal2 = await login('moderator@arsam.net');
+    const chal2 = await login('moderator@example.net');
     const err = await api
       .post('/auth/2fa/verify', { challengeToken: chal2.challengeToken, code: recovery })
       .catch((e: unknown) => e);
@@ -309,7 +309,7 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
   });
 
   it('exposes + updates the policy (super-admin) and enforces the new roles', async () => {
-    const chal = await login('super@arsam.net');
+    const chal = await login('super@example.net');
     const sess = await api.post<LoginResponse>('/auth/2fa/verify', { challengeToken: chal.challengeToken, code: DEMO_TOTP_CODE });
     setAuthToken(sess.token!);
     const pol = await api.get<{ requiredRoles: string[] }>('/auth/security/policy');
@@ -320,26 +320,26 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
     expect(updated.requiredRoles).toContain('moderator');
     clearAuthToken();
     // moderator (not enrolled) now must enrol at login.
-    const mod = await login('moderator@arsam.net');
+    const mod = await login('moderator@example.net');
     expect(mod.requires2faSetup).toBe(true);
   });
 
   it('rejects a policy change from a non-super-admin (403)', async () => {
-    const s = await login('support@arsam.net');
+    const s = await login('support@example.net');
     setAuthToken(s.token!);
     const err = await api.put('/auth/security/policy', { requiredRoles: [] }).catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(403);
   });
 
   it('blocks disabling 2FA for a required role (422) but allows it otherwise', async () => {
-    const chal = await login('super@arsam.net');
+    const chal = await login('super@example.net');
     const sess = await api.post<LoginResponse>('/auth/2fa/verify', { challengeToken: chal.challengeToken, code: DEMO_TOTP_CODE });
     setAuthToken(sess.token!);
     const err = await api.post('/auth/2fa/disable').catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(422);
     clearAuthToken();
 
-    const m = await login('moderator@arsam.net');
+    const m = await login('moderator@example.net');
     setAuthToken(m.token!);
     await api.post('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
     const ok = await api.post<{ ok: boolean }>('/auth/2fa/disable');
@@ -347,7 +347,7 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
   });
 
   it('regenerates recovery codes', async () => {
-    const m = await login('moderator@arsam.net');
+    const m = await login('moderator@example.net');
     setAuthToken(m.token!);
     await api.post('/auth/2fa/enable', { code: DEMO_TOTP_CODE });
     const re = await api.post<{ codes: string[] }>('/auth/2fa/recovery-codes/regenerate');
@@ -357,7 +357,7 @@ describe('auth handlers — 2FA policy & enrollment (035)', () => {
 
 describe('auth handlers — account status (036)', () => {
   it('blocks a suspended account with 403 account_disabled', async () => {
-    const err = await login('disabled@arsam.net').catch((e: unknown) => e);
+    const err = await login('disabled@example.net').catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(403);
     expect(((err as ApiError).body as { code?: string })?.code).toBe('account_disabled');
   });
@@ -365,7 +365,7 @@ describe('auth handlers — account status (036)', () => {
 
 describe('auth handlers — organizations (037)', () => {
   async function authedSuper() {
-    const chal = await login('super@arsam.net');
+    const chal = await login('super@example.net');
     const sess = await api.post<LoginResponse>('/auth/2fa/verify', {
       challengeToken: chal.challengeToken,
       code: DEMO_TOTP_CODE,
@@ -386,14 +386,14 @@ describe('auth handlers — organizations (037)', () => {
   });
 
   it('gives a single-org user exactly one organization', async () => {
-    const m = await login('moderator@arsam.net');
+    const m = await login('moderator@example.net');
     setAuthToken(m.token!);
     const orgs = await api.get<{ organizations: { id: string }[] }>('/auth/organizations');
     expect(orgs.organizations.length).toBe(1);
   });
 
   it('rejects switching to a non-member org (422)', async () => {
-    const m = await login('moderator@arsam.net');
+    const m = await login('moderator@example.net');
     setAuthToken(m.token!);
     const err = await api.post('/auth/organizations/active', { orgId: 'org-ege' }).catch((e: unknown) => e);
     expect((err as ApiError).status).toBe(422);

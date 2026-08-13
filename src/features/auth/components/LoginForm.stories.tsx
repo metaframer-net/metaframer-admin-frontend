@@ -51,8 +51,8 @@ export const Interaction: Story = {
 
     // Fill valid credentials and submit (query by placeholder — the labels carry
     // a required asterisk and "Şifre" also matches the reveal toggle).
-    await userEvent.type(canvas.getByPlaceholderText('ad.soyad@arsam.net'), 'super@arsam.net');
-    await userEvent.type(canvas.getByPlaceholderText('••••••••'), 'arsam1234');
+    await userEvent.type(canvas.getByPlaceholderText('ad.soyad@example.net'), 'super@example.net');
+    await userEvent.type(canvas.getByPlaceholderText('••••••••'), 'example1234');
     await userEvent.click(canvas.getByRole('button', { name: 'Giriş yap' }));
     await expect(args.onSubmit).toHaveBeenCalled();
   },

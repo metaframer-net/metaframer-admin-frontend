@@ -1,10 +1,10 @@
 import type { GeneralSettings, Settings } from '../schemas/settings';
 import { DEFAULT_FLAGS, DEFAULT_LAYOUT_DEFAULTS } from '../schemas/settings';
 
-/** Seed general/system values (sensible defaults for the arsam.net panel). */
+/** Seed general/system values (sensible defaults for the example.net panel). */
 export const DEFAULT_GENERAL: GeneralSettings = {
-  siteName: 'arsam.net',
-  supportEmail: 'destek@arsam.net',
+  siteName: 'example.net',
+  supportEmail: 'destek@example.net',
   defaultLocale: 'tr',
   maintenanceMode: false,
 };

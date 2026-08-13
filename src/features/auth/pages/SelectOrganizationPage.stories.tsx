@@ -12,9 +12,9 @@ import { SelectOrganizationPage } from './SelectOrganizationPage';
 
 const ORGS = {
   organizations: [
-    { id: 'org-main', name: 'arsam.net' },
-    { id: 'org-corp', name: 'arsam Kurumsal' },
-    { id: 'org-ege', name: 'arsam Ege Bölge' },
+    { id: 'org-main', name: 'example.net' },
+    { id: 'org-corp', name: 'Example Kurumsal' },
+    { id: 'org-ege', name: 'Example Ege Bölge' },
   ],
   activeOrgId: 'org-main',
 };

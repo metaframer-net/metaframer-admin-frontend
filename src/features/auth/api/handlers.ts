@@ -68,8 +68,8 @@ const orgIdsForAdmin = (admin: SeedAdmin) => admin.orgs ?? [DEFAULT_ORG_ID];
 
 /** Static mock 2FA enrollment secret (no real TOTP). */
 const DEMO_TOTP_SETUP: TwoFactorSetup = {
-  secret: 'ARSAMDEMOSECRET234',
-  otpauth: 'otpauth://totp/arsam.net?secret=ARSAMDEMOSECRET234&issuer=arsam.net',
+  secret: 'EXAMPLEDEMOSECRET234',
+  otpauth: 'otpauth://totp/example.net?secret=EXAMPLEDEMOSECRET234&issuer=example.net',
 };
 
 const nextId = () => (seq += 1);
@@ -116,7 +116,7 @@ function sessionsFor(userId: string): ActiveSession[] {
   if (!otherSessions.has(userId)) {
     otherSessions.set(userId, [
       { id: 'sess-chrome-win', device: 'Chrome · Windows', location: 'Ankara, TR', lastActive: 'Bugün 09:12', current: false },
-      { id: 'sess-ios-app', device: 'arsam iOS uygulaması', location: 'İzmir, TR', lastActive: '2 gün önce', current: false },
+      { id: 'sess-ios-app', device: 'example iOS uygulaması', location: 'İzmir, TR', lastActive: '2 gün önce', current: false },
     ]);
   }
   const current: ActiveSession = {

@@ -47,7 +47,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Desktop (xl+) — the resting pill is brand-led (`arsam.net`) with the notification
+ * Desktop (xl+) — the resting pill is brand-led (`example.net`) with the notification
  * bell. The status line and the user menu are decluttered into the hover/focus
  * reveal, but stay in the DOM (and keyboard-reachable), so they resolve here.
  */
@@ -59,7 +59,7 @@ export const Default: Story = {
     const pill = body.getByRole('button', { name: /Genel Bakış.*menü ve komut/i });
     await expect(pill).toBeInTheDocument();
     // The resting pill leads with the brand wordmark.
-    await expect(pill).toHaveTextContent('arsam.net');
+    await expect(pill).toHaveTextContent('example.net');
     // Notification bell present with the default flag on.
     await expect(body.getByRole('button', { name: /Bildirimler/ })).toBeInTheDocument();
     // User menu present (in the reveal, still in the DOM).

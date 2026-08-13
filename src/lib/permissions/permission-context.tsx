@@ -23,7 +23,7 @@ export interface SessionContextValue {
 const DEFAULT_USER: SessionUser = {
   id: 'u-1',
   name: 'Ahmet Yönetici',
-  email: 'ahmet@arsam.net',
+  email: 'ahmet@example.net',
   role: 'super-admin',
 };
 

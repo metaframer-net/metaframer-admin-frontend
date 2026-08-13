@@ -10,7 +10,7 @@ beforeEach(() => resetSettingsDb());
 describe('settings handlers', () => {
   it('returns the seed settings envelope', async () => {
     const s = await api.get<Settings>('/settings');
-    expect(s.general.siteName).toBe('arsam.net');
+    expect(s.general.siteName).toBe('example.net');
     expect(s.general.maintenanceMode).toBe(false);
     expect(s.flags.listingDetailMap).toBe(true);
     expect(s.layoutDefaults.mode).toBe('dock');
@@ -19,12 +19,12 @@ describe('settings handlers', () => {
   it('updates general settings and writes a settings.update audit entry', async () => {
     const before = getAuditFor('settings:general').length;
     const s = await api.patch<Settings>('/settings', {
-      general: { siteName: 'arsam panel', maintenanceMode: true },
+      general: { siteName: 'example panel', maintenanceMode: true },
     });
-    expect(s.general.siteName).toBe('arsam panel');
+    expect(s.general.siteName).toBe('example panel');
     expect(s.general.maintenanceMode).toBe(true);
     // Unchanged fields are preserved.
-    expect(s.general.supportEmail).toBe('destek@arsam.net');
+    expect(s.general.supportEmail).toBe('destek@example.net');
     const audit = getAuditFor('settings:general');
     expect(audit.length).toBe(before + 1);
     expect(audit[0]?.action).toBe('settings.update');

@@ -53,14 +53,14 @@ export function LoginForm({ onSubmit, pending = false, errorMessage }: LoginForm
         <FormField
           name="email"
           label="E-posta"
-          help="Kurumsal e-posta adresiniz (örn. ad.soyad@arsam.net)."
+          help="Kurumsal e-posta adresiniz (örn. ad.soyad@example.net)."
           required
         >
           <Input
             type="email"
             autoComplete="username"
             autoFocus
-            placeholder="ad.soyad@arsam.net"
+            placeholder="ad.soyad@example.net"
             disabled={pending}
             data-action="fill-email"
             data-entity="auth"

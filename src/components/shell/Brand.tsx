@@ -17,14 +17,14 @@ export function Brand({ compact = false, className }: BrandProps) {
       className={cn('flex items-center gap-2 rounded-md font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring', className)}
       data-action="navigate"
       data-entity="dashboard"
-      aria-label="arsam.net — Genel Bakış"
+      aria-label="example.net — Genel Bakış"
     >
       <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md">
         <Hexagon className="size-5" />
       </span>
       {!compact && (
         <span className="text-base">
-          arsam<span className="text-muted-foreground">.net</span>
+          example<span className="text-muted-foreground">.net</span>
         </span>
       )}
     </Link>
